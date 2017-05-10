@@ -1,0 +1,8 @@
+includes:
+ - layer:basic
+ - layer:snap
+ - interface:pgsql
+options:
+  snap:
+    vault:
+      channel: stable

@@ -1,0 +1,8 @@
+name: vault
+maintainers:
+  - Paul Collins <paul.collins@canonical.com>
+summary: a vault charm
+description: seriously, it's just a vault charm
+requires:
+  db:
+    interface: pgsql
