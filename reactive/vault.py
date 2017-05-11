@@ -46,6 +46,7 @@ CREATE INDEX IF NOT EXISTS parent_path_idx ON vault_kv_store (parent_path);
 def configure_vault(psql):
     context = {
         'db_conn': psql.master,
+        'disable_mlock': config()['disable-mlock']
     }
     status_set('maintenance', 'creating vault config')
     render('vault.hcl.j2', '/var/snap/vault/common/vault.hcl', context, perms=0o644)
@@ -56,7 +57,19 @@ def configure_vault(psql):
     status_set('maintenance', 'opening vault port')
     open_port(8200)
     set_state('configured')
-    status_set('active', '=^_^=')
+    if config()['disable-mlock']:
+        status_set('active', 'WARNING: DISABLE-MLOCK IS SET -- SECRETS MAY BE LEAKED')
+    else:
+        status_set('active', '=^_^=')
+
+
+@when('snap.installed.vault')
+@when('db.master.available')
+@when('vault.schema.created')
+@when('config.changed.disable-mlock')
+def disable_mlock_changed(psql):
+    configure_vault(psql)
+
 
 @hook('upgrade-charm')
 def upgrade_charm():

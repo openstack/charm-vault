@@ -1,12 +1,11 @@
-# XXX(pjdc): Fix this before we go live!
+{%- if disable_mlock %}
 disable_mlock = true
-
+{%- endif %}
 {%- if db_conn %}
 storage "postgresql" {
   connection_url = "{{ db_conn.uri }}"
 }
 {%- endif %}
-
 listener "tcp" {
  address = "0.0.0.0:8200"
  tls_disable = 1

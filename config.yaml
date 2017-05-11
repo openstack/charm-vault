@@ -1,0 +1,10 @@
+options:
+  disable-mlock:
+    type: boolean
+    default: false
+    description: >-
+      Set this option only if you are deploying to an environment that
+      does not support the mlock(2) system call.
+
+      When this option is set, vault will be unable to prevent secrets
+      from being paged out, so use it with extreme caution.
