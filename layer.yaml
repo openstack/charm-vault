@@ -6,3 +6,8 @@ options:
   snap:
     vault:
       channel: stable
+resources:
+  vault:
+    type: file
+    filename: vault.snap
+    description: Vault snap
