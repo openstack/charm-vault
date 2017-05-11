@@ -3,6 +3,9 @@ includes:
  - layer:snap
  - interface:pgsql
 options:
+  basic:
+    packages:
+      - python3-psycopg2
   snap:
     vault:
       channel: stable
