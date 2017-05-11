@@ -4,7 +4,7 @@ After=syslog.target
 
 [Service]
 Type=simple
-ExecStart=/snap/bin/vault -config /var/snap/vault/common/vault.hcl
+ExecStart=/snap/bin/vault server -config /var/snap/vault/common/vault.hcl
 Restart=always
 User=root
 
