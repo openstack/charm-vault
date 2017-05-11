@@ -1,0 +1,12 @@
+[Unit]
+Description=HashiCorp Vault
+After=syslog.target
+
+[Service]
+Type=simple
+ExecStart=/snap/bin/vault -config /var/snap/vault/common/vault.hcl
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
