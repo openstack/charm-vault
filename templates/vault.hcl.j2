@@ -8,7 +8,12 @@ storage "postgresql" {
 {%- endif %}
 listener "tcp" {
  address = "0.0.0.0:8200"
+{%- if ssl_available %}
+ tls_cert_file = "/var/snap/vault/common/vault.crt"
+ tls_key_file  = "/var/snap/vault/common/vault.key"
+{%- else %}
  tls_disable = 1
+{%- endif %}
 }
 
 

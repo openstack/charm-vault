@@ -8,3 +8,18 @@ options:
 
       When this option is set, vault will be unable to prevent secrets
       from being paged out, so use it with extreme caution.
+  ssl-cert:
+    type: string
+    default:
+    description: >-
+      The SSL certificate, base64-encoded.
+  ssl-chain:
+    type: string
+    default:
+    description: >-
+      The SSL chain certificate, base64-encoded.
+  ssl-key:
+    type: string
+    default:
+    description: >-
+      The SSL key, base64-encoded.

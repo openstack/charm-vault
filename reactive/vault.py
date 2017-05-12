@@ -1,3 +1,4 @@
+import base64
 import psycopg2
 
 from charmhelpers.core.hookenv import (
@@ -9,6 +10,7 @@ from charmhelpers.core.hookenv import (
 from charmhelpers.core.host import (
     service_start,
     service_stop,
+    write_file,
 )
 
 from charmhelpers.core.templating import (
@@ -17,6 +19,7 @@ from charmhelpers.core.templating import (
 
 from charms.reactive import (
     hook,
+    is_state,
     remove_state,
     set_state,
     when,
@@ -39,14 +42,22 @@ VAULT_INDEX_DDL = """
 CREATE INDEX IF NOT EXISTS parent_path_idx ON vault_kv_store (parent_path);
 """
 
+def ssl_available(config):
+    if '' in (config['ssl-cert'], config['ssl-key']):
+        return False
+    return True
+
+
 @when('snap.installed.vault')
 @when_not('configured')
 @when('db.master.available')
 @when('vault.schema.created')
+@when('vault.ssl.configured')
 def configure_vault(psql):
     context = {
         'db_conn': psql.master,
-        'disable_mlock': config()['disable-mlock']
+        'disable_mlock': config()['disable-mlock'],
+        'ssl_available': is_state('vault.ssl.available'),
     }
     status_set('maintenance', 'creating vault config')
     render('vault.hcl.j2', '/var/snap/vault/common/vault.hcl', context, perms=0o644)
@@ -66,6 +77,7 @@ def configure_vault(psql):
 @when('snap.installed.vault')
 @when('db.master.available')
 @when('vault.schema.created')
+@when('vault.ssl.configured')
 @when('config.changed.disable-mlock')
 def disable_mlock_changed(psql):
     configure_vault(psql)
@@ -96,3 +108,41 @@ def create_vault_table(pgsql):
     cur.close()
     conn.close()
     set_state('vault.schema.created')
+
+
+@when('snap.installed.vault')
+@when('config.set.ssl-cert')
+@when('config.set.ssl-key')
+@when_not('vault.ssl.configured')
+def configure_ssl():
+    c = config()
+    if ssl_available(c):
+        status_set('maintenance', 'installing SSL key and cert')
+        ssl_key = base64.decodestring(c['ssl-key'].encode())
+        write_file('/var/snap/vault/common/vault.key', ssl_key, perms=0o600)
+        ssl_cert = base64.decodestring(c['ssl-cert'].encode())
+        if c['ssl-chain']:
+            ssl_cert = ssl_cert + base64.decodestring(c['ssl-chain'].encode())
+        write_file('/var/snap/vault/common/vault.crt', ssl_cert, perms=0o600)
+        set_state('vault.ssl.available')
+    else:
+        remove_state('vault.ssl.available')
+    set_state('vault.ssl.configured')
+
+
+@when('snap.installed.vault')
+@when('config.changed.ssl-cert')
+def ssl_cert_changed():
+    remove_state('vault.ssl.configured')
+
+
+@when('snap.installed.vault')
+@when('config.changed.ssl-chain')
+def ssl_chain_changed():
+    remove_state('vault.ssl.configured')
+
+
+@when('snap.installed.vault')
+@when('config.changed.ssl-key')
+def ssl_key_changed():
+    remove_state('vault.ssl.configured')
