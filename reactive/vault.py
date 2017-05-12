@@ -107,8 +107,6 @@ def create_vault_table(pgsql):
 
 
 @when('snap.installed.vault')
-@when('config.set.ssl-cert')
-@when('config.set.ssl-key')
 @when_not('vault.ssl.configured')
 def configure_ssl():
     c = config()
