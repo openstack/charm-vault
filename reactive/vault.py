@@ -74,13 +74,9 @@ def configure_vault(psql):
         status_set('active', '=^_^=')
 
 
-@when('snap.installed.vault')
-@when('db.master.available')
-@when('vault.schema.created')
-@when('vault.ssl.configured')
 @when('config.changed.disable-mlock')
-def disable_mlock_changed(psql):
-    configure_vault(psql)
+def disable_mlock_changed():
+    remove_state('configured')
 
 
 @hook('upgrade-charm')
@@ -128,21 +124,19 @@ def configure_ssl():
     else:
         remove_state('vault.ssl.available')
     set_state('vault.ssl.configured')
+    remove_state('configured')
 
 
-@when('snap.installed.vault')
 @when('config.changed.ssl-cert')
 def ssl_cert_changed():
     remove_state('vault.ssl.configured')
 
 
-@when('snap.installed.vault')
 @when('config.changed.ssl-chain')
 def ssl_chain_changed():
     remove_state('vault.ssl.configured')
 
 
-@when('snap.installed.vault')
 @when('config.changed.ssl-key')
 def ssl_key_changed():
     remove_state('vault.ssl.configured')
