@@ -104,6 +104,7 @@ def create_vault_table(pgsql):
     cur.close()
     conn.close()
     set_state('vault.schema.created')
+    status_set('active', 'database schema created and committed')
 
 
 @when('snap.installed.vault')
@@ -122,6 +123,7 @@ def configure_ssl():
     else:
         remove_state('vault.ssl.available')
     set_state('vault.ssl.configured')
+    status_set('active', 'SSL key and cert installed')
     remove_state('configured')
 
 
