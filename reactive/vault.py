@@ -1,6 +1,13 @@
 import base64
 import psycopg2
 
+from charmhelpers.contrib.charmsupport.nrpe import (
+    NRPE,
+    add_init_service_checks,
+    get_nagios_hostname,
+    get_nagios_unit_name,
+)
+
 from charmhelpers.core.hookenv import (
     config,
     open_port,
@@ -140,3 +147,15 @@ def ssl_chain_changed():
 @when('config.changed.ssl-key')
 def ssl_key_changed():
     remove_state('vault.ssl.configured')
+
+
+@when('configured')
+@when('nrpe-external-master.available')
+def update_nagios(svc):
+    status_set('maintenance', 'configuring Nagios checks')
+    hostname = get_nagios_hostname()
+    current_unit = get_nagios_unit_name()
+    nrpe = NRPE(hostname=hostname)
+    add_init_service_checks(nrpe, ['vault'], current_unit)
+    nrpe.write()
+    status_set('active', 'Nagios checks configured')

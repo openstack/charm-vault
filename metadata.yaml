@@ -6,3 +6,7 @@ description: seriously, it's just a vault charm
 requires:
   db:
     interface: pgsql
+provides:
+  nrpe-external-master:
+    interface: nrpe-external-master
+    scope: container

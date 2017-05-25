@@ -1,6 +1,7 @@
 includes:
  - layer:basic
  - layer:snap
+ - interface:nrpe-external-master
  - interface:pgsql
 options:
   basic:
