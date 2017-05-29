@@ -18,10 +18,10 @@ options:
       If you're running multiple environments with the same services in them
       this allows you to differentiate between them.
   nagios_servicegroups:
-    default: "juju"
+    default: ""
     type: string
     description: |
-      Comma separated list of nagios servicegroups for the graphite check
+      Comma separated list of nagios servicegroups for the service checks.
   ssl-cert:
     type: string
     default: ""
