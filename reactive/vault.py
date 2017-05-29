@@ -89,6 +89,8 @@ def disable_mlock_changed():
 @hook('upgrade-charm')
 def upgrade_charm():
     remove_state('configured')
+    remove_state('vault.nrpe.configured')
+    remove_state('vault.ssl.configured')
 
 
 @when('db.connected')
@@ -151,6 +153,7 @@ def ssl_key_changed():
 
 @when('configured')
 @when('nrpe-external-master.available')
+@when_not('vault.nrpe.configured')
 def update_nagios(svc):
     status_set('maintenance', 'configuring Nagios checks')
     hostname = get_nagios_hostname()
@@ -158,4 +161,15 @@ def update_nagios(svc):
     nrpe = NRPE(hostname=hostname)
     add_init_service_checks(nrpe, ['vault'], current_unit)
     nrpe.write()
+    set_state('vault.nrpe.configured')
     status_set('active', 'Nagios checks configured')
+
+
+@when('config.changed.nagios_context')
+def nagios_context_changed():
+    remove_state('vault.nrpe.configured')
+
+
+@when('config.changed.nagios_servicegroups')
+def nagios_servicegroups_changed():
+    remove_state('vault.nrpe.configured')
