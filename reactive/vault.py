@@ -160,6 +160,13 @@ def update_nagios(svc):
     current_unit = get_nagios_unit_name()
     nrpe = NRPE(hostname=hostname)
     add_init_service_checks(nrpe, ['vault'], current_unit)
+    write_file('/usr/lib/nagios/plugins/check_vault_version.py',
+               open('files/nagios/check_vault_version.py', 'rb').read(), perms=0o755)
+    nrpe.add_check(
+        'vault_version',
+        'Check running vault server version is same as installed snap',
+        '/usr/lib/nagios/plugins/check_vault_version.py',
+    )
     nrpe.write()
     set_state('vault.nrpe.configured')
     status_set('active', 'Nagios checks configured')
