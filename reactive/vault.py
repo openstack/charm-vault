@@ -67,7 +67,7 @@ def configure_vault(psql):
         'ssl_available': is_state('vault.ssl.available'),
     }
     status_set('maintenance', 'creating vault config')
-    render('vault.hcl.j2', '/var/snap/vault/common/vault.hcl', context, perms=0o644)
+    render('vault.hcl.j2', '/var/snap/vault/common/vault.hcl', context, perms=0o600)
     status_set('maintenance', 'creating vault unit file')
     render('vault.service.j2', '/etc/systemd/system/vault.service', {}, perms=0o644)
     status_set('maintenance', 'starting vault')
