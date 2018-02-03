@@ -2,3 +2,5 @@ flake8>=2.2.4,<=2.4.1
 os-testr>=0.4.1
 mock>=1.2
 coverage>=3.6
+psycopg2
+charms.reactive
