@@ -134,10 +134,10 @@ def configure_ssl():
             ssl_cert = ssl_cert + base64.decodestring(c['ssl-chain'].encode())
         write_file('/var/snap/vault/common/vault.crt', ssl_cert, perms=0o600)
         set_state('vault.ssl.available')
+        status_set('active', 'SSL key and cert installed')
     else:
         remove_state('vault.ssl.available')
     set_state('vault.ssl.configured')
-    status_set('active', 'SSL key and cert installed')
     remove_state('configured')
 
 
