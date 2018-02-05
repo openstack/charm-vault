@@ -16,7 +16,6 @@ from charmhelpers.core.hookenv import (
 
 from charmhelpers.core.host import (
     service_start,
-    service_stop,
     write_file,
 )
 
@@ -33,7 +32,7 @@ from charms.reactive import (
     when_not,
 )
 
-# as per https://www.vaultproject.io/docs/configuration/storage/postgresql.html
+# See https://www.vaultproject.io/docs/configuration/storage/postgresql.html
 
 VAULT_TABLE_DDL = """
 CREATE TABLE IF NOT EXISTS vault_kv_store (
@@ -48,6 +47,7 @@ CREATE TABLE IF NOT EXISTS vault_kv_store (
 VAULT_INDEX_DDL = """
 CREATE INDEX IF NOT EXISTS parent_path_idx ON vault_kv_store (parent_path);
 """
+
 
 def ssl_available(config):
     if '' in (config['ssl-cert'], config['ssl-key']):
@@ -67,16 +67,26 @@ def configure_vault(psql):
         'ssl_available': is_state('vault.ssl.available'),
     }
     status_set('maintenance', 'creating vault config')
-    render('vault.hcl.j2', '/var/snap/vault/common/vault.hcl', context, perms=0o600)
+    render(
+        'vault.hcl.j2',
+        '/var/snap/vault/common/vault.hcl',
+        context,
+        perms=0o600)
     status_set('maintenance', 'creating vault unit file')
-    render('vault.service.j2', '/etc/systemd/system/vault.service', {}, perms=0o644)
+    render(
+        'vault.service.j2',
+        '/etc/systemd/system/vault.service',
+        {},
+        perms=0o644)
     status_set('maintenance', 'starting vault')
     service_start('vault')      # restart seals the vault
     status_set('maintenance', 'opening vault port')
     open_port(8200)
     set_state('configured')
     if config()['disable-mlock']:
-        status_set('active', 'WARNING: DISABLE-MLOCK IS SET -- SECRETS MAY BE LEAKED')
+        status_set(
+            'active',
+            'WARNING: DISABLE-MLOCK IS SET -- SECRETS MAY BE LEAKED')
     else:
         status_set('active', '=^_^=')
 
@@ -165,8 +175,10 @@ def update_nagios(svc):
     current_unit = get_nagios_unit_name()
     nrpe = NRPE(hostname=hostname)
     add_init_service_checks(nrpe, ['vault'], current_unit)
-    write_file('/usr/lib/nagios/plugins/check_vault_version.py',
-               open('files/nagios/check_vault_version.py', 'rb').read(), perms=0o755)
+    write_file(
+        '/usr/lib/nagios/plugins/check_vault_version.py',
+        open('files/nagios/check_vault_version.py', 'rb').read(),
+        perms=0o755)
     nrpe.add_check(
         'vault_version',
         'Check running vault server version is same as installed snap',

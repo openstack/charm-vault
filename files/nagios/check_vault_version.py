@@ -15,8 +15,6 @@ import sys
 from textwrap import dedent
 from urllib.request import urlopen
 
-#VAULT_HEALTH_URL = 'https://vault.staging.admin.canonical.com:8200/v1/sys/health'
-#VAULT_VERIFY_SSL = True
 VAULT_HEALTH_URL = 'https://127.0.0.1:8200/v1/sys/health'
 VAULT_VERIFY_SSL = False
 
@@ -34,7 +32,8 @@ def get_vault_snap_version():
         snapd.connect(SNAPD_SOCKET)
         snapd.sendall(SNAPD_INFO_REQUEST.format(snap='vault').encode('utf-8'))
         # TODO(pjdc): This should be a loop.
-        info = json.loads(snapd.recv(1024 * 1024).decode('utf-8').split('\n')[-1])
+        info = json.loads(
+            snapd.recv(1024 * 1024).decode('utf-8').split('\n')[-1])
         version = info['result']['version']
         if version.startswith('v'):
             version = version[1:]
