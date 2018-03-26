@@ -12,6 +12,7 @@ description: |
   credentials, SQL/NoSQL databases, X.509 certificates,
   SSH credentials, and more.
 series:
+  - bionic
   - xenial
 tags:
   - security
