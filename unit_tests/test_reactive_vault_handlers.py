@@ -1,5 +1,4 @@
 import mock
-import unittest
 from unittest.mock import patch
 
 import charms.reactive
@@ -11,10 +10,11 @@ charms.reactive.hook = dec_mock
 charms.reactive.when = dec_mock
 charms.reactive.when_not = dec_mock
 
-import reactive.vault as handlers  # noqa: E402
+import reactive.vault_handlers as handlers  # noqa: E402
+import unit_tests.test_utils
 
 
-class TestHandlers(unittest.TestCase):
+class TestHandlers(unit_tests.test_utils.CharmTestCase):
 
     _health_response = {
         "initialized": True,
@@ -48,6 +48,7 @@ class TestHandlers(unittest.TestCase):
 
     def setUp(self):
         super(TestHandlers, self).setUp()
+        self.obj = handlers
         self.patches = [
             'config',
             'endpoint_from_flag',
@@ -62,26 +63,14 @@ class TestHandlers(unittest.TestCase):
             'status_set',
             'remove_state',
             'render',
-            'unit_private_ip',
             'application_version_set',
             'local_unit',
-            'network_get_primary_address',
             'snap',
             'is_flag_set',
             'set_flag',
             'clear_flag',
         ]
         self.patch_all()
-
-    def _patch(self, method):
-        _m = patch.object(handlers, method)
-        mock = _m.start()
-        self.addCleanup(_m.stop)
-        return mock
-
-    def patch_all(self):
-        for method in self.patches:
-            setattr(self, method, self._patch(method))
 
     def test_ssl_available(self):
         self.assertFalse(handlers.ssl_available({
@@ -225,9 +214,9 @@ class TestHandlers(unittest.TestCase):
         ])
 
     @patch.object(handlers, 'save_etcd_client_credentials')
-    @patch.object(handlers, 'get_cluster_url')
+    @patch.object(handlers.vault, 'get_cluster_url')
     @patch.object(handlers, 'can_restart')
-    @patch.object(handlers, 'get_api_url')
+    @patch.object(handlers.vault, 'get_api_url')
     def test_configure_vault_etcd(self, get_api_url, can_restart,
                                   get_cluster_url,
                                   save_etcd_client_credentials):
@@ -272,7 +261,7 @@ class TestHandlers(unittest.TestCase):
         self.is_flag_set.assert_called_with('etcd.tls.available')
 
     @patch.object(handlers.hvac, 'Client')
-    @patch.object(handlers, 'get_api_url')
+    @patch.object(handlers.vault, 'get_api_url')
     def test_get_client(self, get_api_url, hvac_Client):
         get_api_url.return_value = 'http://this-unit'
         handlers.get_client()
@@ -305,31 +294,7 @@ class TestHandlers(unittest.TestCase):
         get_client.return_value = hvac_mock
         self.assertFalse(handlers.can_restart())
 
-    def test_get_api_url_ssl(self):
-        self.is_state.return_value = True
-        self.network_get_primary_address.return_value = '1.2.3.4'
-        self.assertEqual(handlers.get_api_url(), 'https://1.2.3.4:8200')
-        self.network_get_primary_address.assert_called_with('access')
-
-    def test_get_api_url_nossl(self):
-        self.is_state.return_value = False
-        self.network_get_primary_address.return_value = '1.2.3.4'
-        self.assertEqual(handlers.get_api_url(), 'http://1.2.3.4:8200')
-        self.network_get_primary_address.assert_called_with('access')
-
-    def test_get_cluster_url_ssl(self):
-        self.is_state.return_value = True
-        self.network_get_primary_address.return_value = '1.2.3.4'
-        self.assertEqual(handlers.get_cluster_url(), 'https://1.2.3.4:8201')
-        self.network_get_primary_address.assert_called_with('cluster')
-
-    def test_get_cluster_url_nossl(self):
-        self.is_state.return_value = False
-        self.network_get_primary_address.return_value = '1.2.3.4'
-        self.assertEqual(handlers.get_cluster_url(), 'http://1.2.3.4:8201')
-        self.network_get_primary_address.assert_called_with('cluster')
-
-    @patch.object(handlers, 'get_api_url')
+    @patch.object(handlers.vault, 'get_api_url')
     @patch.object(handlers, 'requests')
     def test_get_vault_health(self, requests, get_api_url):
         get_api_url.return_value = "https://vault.demo.com:8200"

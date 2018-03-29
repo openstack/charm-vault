@@ -1,0 +1,8 @@
+authorize-charm:
+  description: Authorize the vault charm to interact with vault
+  properties:
+    token:
+      type: string
+      description: Token to use to authorize charm
+  required:
+  - token

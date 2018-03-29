@@ -1,5 +1,4 @@
 import base64
-import functools
 import hvac
 import psycopg2
 import requests
@@ -19,13 +18,13 @@ from charmhelpers.core.hookenv import (
     ERROR,
     config,
     log,
+    network_get_primary_address,
     open_port,
     status_set,
     unit_private_ip,
     application_version_set,
     atexit,
     local_unit,
-    network_get_primary_address,
 )
 
 from charmhelpers.core.host import (
@@ -59,6 +58,7 @@ from charms.reactive.flags import (
 )
 
 from charms.layer import snap
+import lib.charm.vault as vault
 
 # See https://www.vaultproject.io/docs/configuration/storage/postgresql.html
 
@@ -87,14 +87,15 @@ REQUIRED_INTERFACES = [
 
 
 def get_client():
-    return hvac.Client(url=get_api_url())
+    return hvac.Client(url=vault.get_api_url())
 
 
 @tenacity.retry(wait=tenacity.wait_exponential(multiplier=1, max=10),
                 stop=tenacity.stop_after_attempt(10),
                 reraise=True)
 def get_vault_health():
-    response = requests.get(VAULT_HEALTH_URL.format(vault_addr=get_api_url()))
+    response = requests.get(
+        VAULT_HEALTH_URL.format(vault_addr=vault.get_api_url()))
     return response.json()
 
 
@@ -182,8 +183,8 @@ def configure_vault(context):
                                      key=context['etcd_tls_key_file'],
                                      cert=context['etcd_tls_cert_file'],
                                      ca=context['etcd_tls_ca_file'])
-        context['api_addr'] = get_api_url()
-        context['cluster_addr'] = get_cluster_url()
+        context['api_addr'] = vault.get_api_url()
+        context['cluster_addr'] = vault.get_cluster_url()
         log("Etcd detected, setting api_addr to {}".format(
             context['api_addr']))
     else:
@@ -207,27 +208,6 @@ def configure_vault(context):
         service_start('vault')      # restart seals the vault
     log("Opening vault port", level=DEBUG)
     open_port(8200)
-
-
-def binding_address(binding):
-    try:
-        return network_get_primary_address(binding)
-    except NotImplementedError:
-        return unit_private_ip()
-
-
-def get_vault_url(binding, port):
-    protocol = 'http'
-    ip = binding_address(binding)
-    if is_state('vault.ssl.available'):
-        protocol = 'https'
-    return '{}://{}:{}'.format(protocol, ip, port)
-
-
-get_api_url = functools.partial(get_vault_url,
-                                binding='access', port=8200)
-get_cluster_url = functools.partial(get_vault_url,
-                                    binding='cluster', port=8201)
 
 
 @when('snap.installed.vault')
