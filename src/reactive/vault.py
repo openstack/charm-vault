@@ -55,17 +55,9 @@ def ssl_available(config):
     return True
 
 
-@when('snap.installed.vault')
-@when_not('configured')
-@when('db.master.available')
-@when('vault.schema.created')
-@when('vault.ssl.configured')
-def configure_vault(psql):
-    context = {
-        'db_conn': psql.master,
-        'disable_mlock': config()['disable-mlock'],
-        'ssl_available': is_state('vault.ssl.available'),
-    }
+def configure_vault(context):
+    context['disable_mlock'] = config()['disable-mlock']
+    context['ssl_available'] = is_state('vault.ssl.available')
     status_set('maintenance', 'creating vault config')
     render(
         'vault.hcl.j2',
@@ -91,6 +83,31 @@ def configure_vault(psql):
         status_set('active', '=^_^=')
 
 
+@when('snap.installed.vault')
+@when_not('configured')
+@when('db.master.available')
+@when('vault.schema.created')
+@when('vault.ssl.configured')
+def configure_vault_psql(psql):
+    context = {
+        'storage_name': 'psql',
+        'psql_db_conn': psql.master,
+    }
+    configure_vault(context)
+
+
+@when('snap.installed.vault')
+@when_not('configured')
+@when('shared-db.available')
+@when('vault.ssl.configured')
+def configure_vault_mysql(mysql):
+    context = {
+        'storage_name': 'mysql',
+        'mysql_db_relation': mysql,
+    }
+    configure_vault(context)
+
+
 @when('config.changed.disable-mlock')
 def disable_mlock_changed():
     remove_state('configured')
@@ -106,6 +123,17 @@ def upgrade_charm():
 @when('db.connected')
 def request_db(pgsql):
     pgsql.set_database('vault')
+
+
+@when('shared-db.connected')
+def mysql_setup(database):
+    """Handle the default database connection setup
+    """
+    db = {
+        'database': 'vault',
+        'username': 'vault',
+    }
+    database.configure(**db)
 
 
 @when('db.master.available')
@@ -144,10 +172,10 @@ def configure_ssl():
             ssl_cert = ssl_cert + base64.decodestring(c['ssl-chain'].encode())
         write_file('/var/snap/vault/common/vault.crt', ssl_cert, perms=0o600)
         set_state('vault.ssl.available')
-        status_set('active', 'SSL key and cert installed')
     else:
         remove_state('vault.ssl.available')
     set_state('vault.ssl.configured')
+    status_set('active', 'SSL key and cert installed')
     remove_state('configured')
 
 

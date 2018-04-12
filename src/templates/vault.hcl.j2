@@ -1,9 +1,16 @@
 {%- if disable_mlock %}
 disable_mlock = true
 {%- endif %}
-{%- if db_conn %}
+{%- if storage_name == 'psql' %}
 storage "postgresql" {
-  connection_url = "{{ db_conn.uri }}"
+  connection_url = "{{ psql_db_conn.uri }}"
+}
+{% elif storage_name == 'mysql' %}
+storage "mysql" {
+  username = "{{ mysql_db_relation.username() }}"
+  password = "{{ mysql_db_relation.password() }}"
+  database = "{{ mysql_db_relation.database() }}"
+  address = "{{ mysql_db_relation.db_host() }}:3306"
 }
 {%- endif %}
 listener "tcp" {

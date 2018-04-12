@@ -3,6 +3,7 @@ includes:
  - layer:snap
  - interface:nrpe-external-master
  - interface:pgsql
+ - interface:mysql-shared
 options:
   basic:
     packages:

@@ -1,0 +1,12 @@
+series: xenial
+services:
+  vault:
+    num_units: 1
+    series: xenial
+    charm: ../../../vault
+  mysql:
+    charm: cs:mysql
+    num_units: 1
+relations:
+- - vault:shared-db
+  - mysql:shared-db

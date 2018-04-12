@@ -41,12 +41,13 @@ class TestHandlers(unittest.TestCase):
                              service_start, open_port, config, is_state):
         config.return_value = {'disable-mlock': False}
         is_state.return_value = True
-        psql = mock.MagicMock()
-        psql = mock.MagicMock()
-        psql.master = 'myuri'
-        handlers.configure_vault(psql)
+        db_context = {
+            'storage_name': 'psql',
+            'psql_db_conn': 'myuri'}
+        handlers.configure_vault(db_context)
         expected_context = {
-            'db_conn': 'myuri',
+            'storage_name': 'psql',
+            'psql_db_conn': 'myuri',
             'disable_mlock': False,
             'ssl_available': True,
         }
@@ -76,7 +77,7 @@ class TestHandlers(unittest.TestCase):
         # Check flipping disable-mlock makes it to the context
         config.return_value = {'disable-mlock': True}
         expected_context['disable_mlock'] = True
-        handlers.configure_vault(psql)
+        handlers.configure_vault(db_context)
         render_calls = [
             mock.call(
                 'vault.hcl.j2',
@@ -90,6 +91,23 @@ class TestHandlers(unittest.TestCase):
                 perms=0o644)
         ]
         render.assert_has_calls(render_calls)
+
+    @patch.object(handlers, 'configure_vault')
+    def test_configure_vault_psql(self, configure_vault):
+        psql = mock.MagicMock()
+        psql.master = 'myuri'
+        handlers.configure_vault_psql(psql)
+        configure_vault.assert_called_once_with({
+            'storage_name': 'psql',
+            'psql_db_conn': 'myuri'})
+
+    @patch.object(handlers, 'configure_vault')
+    def test_configure_vault_msql(self, configure_vault):
+        mysql = mock.MagicMock()
+        handlers.configure_vault_mysql(mysql)
+        configure_vault.assert_called_once_with({
+            'storage_name': 'mysql',
+            'mysql_db_relation': mysql})
 
     @patch.object(handlers, 'remove_state')
     def test_disable_mlock_changed(self, remove_state):
