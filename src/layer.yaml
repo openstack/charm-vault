@@ -4,6 +4,7 @@ includes:
  - interface:nrpe-external-master
  - interface:pgsql
  - interface:mysql-shared
+ - interface:etcd
 options:
   basic:
     packages:

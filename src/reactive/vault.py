@@ -1,6 +1,8 @@
 import base64
+import hvac
 import psycopg2
 import subprocess
+
 
 from charmhelpers.contrib.charmsupport.nrpe import (
     NRPE,
@@ -10,12 +12,17 @@ from charmhelpers.contrib.charmsupport.nrpe import (
 )
 
 from charmhelpers.core.hookenv import (
+    DEBUG,
     config,
+    log,
     open_port,
     status_set,
+    unit_private_ip,
 )
 
 from charmhelpers.core.host import (
+    service_restart,
+    service_running,
     service_start,
     write_file,
 )
@@ -31,6 +38,10 @@ from charms.reactive import (
     set_state,
     when,
     when_not,
+)
+
+from charms.reactive.relations import (
+    endpoint_from_flag,
 )
 
 # See https://www.vaultproject.io/docs/configuration/storage/postgresql.html
@@ -50,6 +61,24 @@ CREATE INDEX IF NOT EXISTS parent_path_idx ON vault_kv_store (parent_path);
 """
 
 
+def get_client():
+    return hvac.Client(url=get_api_url())
+
+
+def can_restart():
+    safe_restart = False
+    if not service_running('vault'):
+        safe_restart = True
+    else:
+        client = get_client()
+        if not client.is_initialized():
+            safe_restart = True
+        elif client.is_sealed():
+            safe_restart = True
+    log("Safe to restart: {}".format(safe_restart), level=DEBUG)
+    return safe_restart
+
+
 def ssl_available(config):
     if '' in (config['ssl-cert'], config['ssl-key']):
         return False
@@ -59,7 +88,27 @@ def ssl_available(config):
 def configure_vault(context):
     context['disable_mlock'] = config()['disable-mlock']
     context['ssl_available'] = is_state('vault.ssl.available')
+    log("Running configure_vault", level=DEBUG)
+    context['disable_mlock'] = config()['disable-mlock']
+    context['ssl_available'] = is_state('vault.ssl.available')
+    etcd = endpoint_from_flag('etcd.available')
+    if etcd:
+        log("Etcd detected, adding to context", level=DEBUG)
+        context['etcd_conn'] = etcd.connection_string()
+        context['etcd_tls_ca_file'] = '/var/snap/vault/common/etcd-ca.pem'
+        context['etcd_tls_cert_file'] = '/var/snap/vault/common/etcd-cert.pem'
+        context['etcd_tls_key_file'] = '/var/snap/vault/common/etcd.key'
+        etcd.save_client_credentials(
+            context['etcd_tls_key_file'],
+            context['etcd_tls_cert_file'],
+            context['etcd_tls_ca_file'])
+        context['vault_api_url'] = get_api_url()
+        log("Etcd detected, setting vault_api_url to {}".format(
+            context['vault_api_url']))
+    else:
+        log("Etcd not detected", level=DEBUG)
     status_set('maintenance', 'creating vault config')
+    log("Rendering vault.hcl.j2", level=DEBUG)
     render(
         'vault.hcl.j2',
         '/var/snap/vault/common/vault.hcl',
@@ -72,7 +121,10 @@ def configure_vault(context):
         {},
         perms=0o644)
     status_set('maintenance', 'starting vault')
-    service_start('vault')      # restart seals the vault
+    if can_restart():
+        service_restart('vault')
+    else:
+        service_start('vault')      # restart seals the vault
     status_set('maintenance', 'opening vault port')
     open_port(8200)
     set_state('configured')
@@ -82,6 +134,15 @@ def configure_vault(context):
             'WARNING: DISABLE-MLOCK IS SET -- SECRETS MAY BE LEAKED')
     else:
         status_set('active', '=^_^=')
+
+
+def get_api_url():
+    protocol = 'http'
+    port = '8200'
+    ip = unit_private_ip()
+    if is_state('vault.ssl.available'):
+        protocol = 'https'
+    return '{}://{}:{}'.format(protocol, ip, port)
 
 
 @when('snap.installed.vault')
@@ -205,6 +266,24 @@ def ssl_key_changed():
 @when('config.changed.ssl-ca')
 def ssl_ca_changed():
     remove_state('vault.ssl.configured')
+
+
+@when_not('etcd.local.configured')
+@when('etcd.available')
+def etcd_setup(etcd):
+    log("Detected etcd.available, removing configured", level=DEBUG)
+    remove_state('configured')
+    remove_state('etcd.local.unconfigured')
+    set_state('etcd.local.configured')
+
+
+@when_not('etcd.local.unconfigured')
+@when_not('etcd.available')
+def etcd_not_ready():
+    log("Detected etcd_not_ready, removing configured", level=DEBUG)
+    set_state('etcd.local.unconfigured')
+    remove_state('etcd.local.configured')
+    remove_state('configured')
 
 
 @when('configured')

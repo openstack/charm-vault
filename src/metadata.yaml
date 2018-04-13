@@ -21,6 +21,8 @@ requires:
     interface: pgsql
   shared-db:
     interface: mysql-shared
+  etcd:
+    interface: etcd
 provides:
   nrpe-external-master:
     interface: nrpe-external-master
