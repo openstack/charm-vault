@@ -279,3 +279,10 @@ class TestHandlers(unittest.TestCase):
         self.service_running.return_value = False
         handlers._assess_status()
         self.application_version_set.assert_not_called()
+
+    def test_cluster_connected(self):
+        self.config.return_value = '10.1.1.1'
+        hacluster_mock = mock.MagicMock()
+        handlers.cluster_connected(hacluster_mock)
+        hacluster_mock.add_vip.assert_called_once_with('vault', '10.1.1.1')
+        hacluster_mock.bind_resources.assert_called_once_with()

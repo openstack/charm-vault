@@ -338,3 +338,11 @@ def _assess_status():
     if service_running('vault'):
         health = get_vault_health()
         application_version_set(health.get('version'))
+
+
+@when('ha.connected')
+def cluster_connected(hacluster):
+    """Configure HA resources in corosync"""
+    vip = config('vip')
+    hacluster.add_vip('vault', vip)
+    hacluster.bind_resources()

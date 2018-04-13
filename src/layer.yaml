@@ -5,10 +5,12 @@ includes:
  - interface:pgsql
  - interface:mysql-shared
  - interface:etcd
+ - interface:hacluster
 options:
   basic:
     packages:
       - python3-psycopg2
+      - libffi-dev
   snap:
     vault:
       channel: stable
