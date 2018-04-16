@@ -1,6 +1,7 @@
 import base64
 import hvac
 import psycopg2
+import requests
 import subprocess
 
 
@@ -18,6 +19,8 @@ from charmhelpers.core.hookenv import (
     open_port,
     status_set,
     unit_private_ip,
+    application_version_set,
+    atexit,
 )
 
 from charmhelpers.core.host import (
@@ -60,9 +63,16 @@ VAULT_INDEX_DDL = """
 CREATE INDEX IF NOT EXISTS parent_path_idx ON vault_kv_store (parent_path);
 """
 
+VAULT_HEALTH_URL = '{vault_addr}/v1/sys/health'
+
 
 def get_client():
     return hvac.Client(url=get_api_url())
+
+
+def get_vault_health():
+    response = requests.get(VAULT_HEALTH_URL.format(vault_addr=get_api_url()))
+    return response.json()
 
 
 def can_restart():
@@ -317,3 +327,14 @@ def nagios_context_changed():
 @when('config.changed.nagios_servicegroups')
 def nagios_servicegroups_changed():
     remove_state('vault.nrpe.configured')
+
+
+@when('snap.installed.vault')
+def prime_assess_status():
+    atexit(_assess_status)
+
+
+def _assess_status():
+    if service_running('vault'):
+        health = get_vault_health()
+        application_version_set(health.get('version'))

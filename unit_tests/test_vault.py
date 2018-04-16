@@ -16,6 +16,16 @@ import reactive.vault as handlers  # noqa: E402
 
 class TestHandlers(unittest.TestCase):
 
+    _health_response = {
+        "initialized": True,
+        "sealed": False,
+        "standby": False,
+        "server_time_utc": 1523952750,
+        "version": "0.9.0",
+        "cluster_name": "vault-cluster-9dd8dd12",
+        "cluster_id": "1ea3d74c-3819-fbaf-f780-bae0babc998f"
+    }
+
     def setUp(self):
         super(TestHandlers, self).setUp()
         self.patches = [
@@ -32,6 +42,7 @@ class TestHandlers(unittest.TestCase):
             'remove_state',
             'render',
             'unit_private_ip',
+            'application_version_set',
         ]
         self.patch_all()
 
@@ -240,3 +251,31 @@ class TestHandlers(unittest.TestCase):
         self.is_state.return_value = False
         self.unit_private_ip.return_value = '1.2.3.4'
         self.assertEqual(handlers.get_api_url(), 'http://1.2.3.4:8200')
+
+    @patch.object(handlers, 'get_api_url')
+    @patch.object(handlers, 'requests')
+    def test_get_vault_health(self, requests, get_api_url):
+        get_api_url.return_value = "https://vault.demo.com:8200"
+        mock_response = mock.MagicMock()
+        mock_response.json.return_value = self._health_response
+        requests.get.return_value = mock_response
+        self.assertEqual(handlers.get_vault_health(),
+                         self._health_response)
+        requests.get.assert_called_with(
+            "https://vault.demo.com:8200/v1/sys/health")
+        mock_response.json.assert_called_once()
+
+    @patch.object(handlers, 'get_vault_health')
+    def test_assess_status(self, get_vault_health):
+        get_vault_health.return_value = self._health_response
+        self.service_running.return_value = True
+        handlers._assess_status()
+        self.application_version_set.assert_called_with(
+            self._health_response['version'])
+
+    @patch.object(handlers, 'get_vault_health')
+    def test_assess_status_not_running(self, get_vault_health):
+        get_vault_health.return_value = self._health_response
+        self.service_running.return_value = False
+        handlers._assess_status()
+        self.application_version_set.assert_not_called()
