@@ -37,3 +37,8 @@ options:
     default: ""
     description: >-
       The SSL key, base64-encoded.
+  ssl-ca:
+    type: string
+    default: ""
+    description: >-
+      The SSL Root CA certificate, base64-encoded.

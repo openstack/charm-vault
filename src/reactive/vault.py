@@ -1,5 +1,6 @@
 import base64
 import psycopg2
+import subprocess
 
 from charmhelpers.contrib.charmsupport.nrpe import (
     NRPE,
@@ -174,6 +175,13 @@ def configure_ssl():
         set_state('vault.ssl.available')
     else:
         remove_state('vault.ssl.available')
+
+    if c['ssl-ca']:
+        ssl_ca = base64.decodestring(c['ssl-ca'].encode())
+        write_file('/usr/local/share/ca-certificates/vault-ca.crt',
+                   ssl_ca, perms=0o644)
+        subprocess.check_call(['update-ca-certificates', '--fresh'])
+
     set_state('vault.ssl.configured')
     status_set('active', 'SSL key and cert installed')
     remove_state('configured')
@@ -191,6 +199,11 @@ def ssl_chain_changed():
 
 @when('config.changed.ssl-key')
 def ssl_key_changed():
+    remove_state('vault.ssl.configured')
+
+
+@when('config.changed.ssl-ca')
+def ssl_ca_changed():
     remove_state('vault.ssl.configured')
 
 
