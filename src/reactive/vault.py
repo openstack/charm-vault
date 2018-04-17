@@ -3,6 +3,7 @@ import hvac
 import psycopg2
 import requests
 import subprocess
+import tenacity
 
 
 from charmhelpers.contrib.charmsupport.nrpe import (
@@ -48,6 +49,10 @@ from charms.reactive.relations import (
     endpoint_from_flag,
 )
 
+from charms.reactive.flags import (
+    is_flag_set
+)
+
 # See https://www.vaultproject.io/docs/configuration/storage/postgresql.html
 
 VAULT_TABLE_DDL = """
@@ -66,11 +71,21 @@ CREATE INDEX IF NOT EXISTS parent_path_idx ON vault_kv_store (parent_path);
 
 VAULT_HEALTH_URL = '{vault_addr}/v1/sys/health'
 
+OPTIONAL_INTERFACES = [
+    ['etcd'],
+]
+REQUIRED_INTERFACES = [
+    ['shared-db', 'db.master']
+]
+
 
 def get_client():
     return hvac.Client(url=get_api_url())
 
 
+@tenacity.retry(wait=tenacity.wait_exponential(multiplier=1, max=10),
+                stop=tenacity.stop_after_attempt(10),
+                reraise=True)
 def get_vault_health():
     response = requests.get(VAULT_HEALTH_URL.format(vault_addr=get_api_url()))
     return response.json()
@@ -126,33 +141,25 @@ def configure_vault(context):
             context['vault_api_url']))
     else:
         log("Etcd not detected", level=DEBUG)
-    status_set('maintenance', 'creating vault config')
     log("Rendering vault.hcl.j2", level=DEBUG)
     render(
         'vault.hcl.j2',
         '/var/snap/vault/common/vault.hcl',
         context,
         perms=0o600)
-    status_set('maintenance', 'creating vault unit file')
+    log("Rendering vault systemd configuation", level=DEBUG)
     render(
         'vault.service.j2',
         '/etc/systemd/system/vault.service',
         {},
         perms=0o644)
-    status_set('maintenance', 'starting vault')
     if can_restart():
+        log("Restarting vault", level=DEBUG)
         service_restart('vault')
     else:
         service_start('vault')      # restart seals the vault
-    status_set('maintenance', 'opening vault port')
+    log("Opening vault port", level=DEBUG)
     open_port(8200)
-    set_state('configured')
-    if config()['disable-mlock']:
-        status_set(
-            'active',
-            'WARNING: DISABLE-MLOCK IS SET -- SECRETS MAY BE LEAKED')
-    else:
-        status_set('active', '=^_^=')
 
 
 def get_api_url():
@@ -267,7 +274,6 @@ def configure_ssl():
         subprocess.check_call(['update-ca-certificates', '--fresh'])
 
     set_state('vault.ssl.configured')
-    status_set('active', 'SSL key and cert installed')
     remove_state('configured')
 
 
@@ -329,7 +335,6 @@ def update_nagios(svc):
     )
     nrpe.write()
     set_state('vault.nrpe.configured')
-    status_set('active', 'Nagios checks configured')
 
 
 @when('config.changed.nagios_context')
@@ -347,10 +352,87 @@ def prime_assess_status():
     atexit(_assess_status)
 
 
-def _assess_status():
-    if service_running('vault'):
-        health = get_vault_health()
-        application_version_set(health.get('version'))
+def _assess_interface(interface, optional,
+                      missing_interfaces, incomplete_interfaces):
+    """Assess a named interface for presence and completeness
+
+    Uses reactive flags 'connected' and 'available' to indicate whether
+    an interface is present and complete.
+
+    :param: interface: Name of interface to assess.
+    :param: options: Boolean indicating whether interface is optional
+    :param: missing_interfaces: List of missing interfaces to update
+    :param: incomplete_interfaces: List of incomplete interfaces to update
+    :returns: bool, bool: Tuple of booleans indicating (missing, incomplete)
+    """
+    log("Assessing interface {}".format(interface), level=DEBUG)
+    base_name = interface.split('.')[0]
+    connected = (
+        is_flag_set('{}.connected'.format(interface)) or
+        is_flag_set('{}.connected'.format(base_name))
+    )
+    missing = False
+    incomplete = False
+    if not connected:
+        if not optional:
+            missing_interfaces.append(base_name)
+        missing = True
+        incomplete = True
+    elif connected and not is_flag_set('{}.available'.format(interface)):
+        incomplete_interfaces.append(base_name)
+        incomplete = True
+    return (missing, incomplete)
+
+
+def _assess_interface_groups(interfaces, optional,
+                             missing_interfaces, incomplete_interfaces):
+    """Assess the relation state of a list of interface groups
+
+    :param: interfaces: List of interface groups
+    :param: options: Boolean indicating whether interfaces are optional
+    :param: missing_interfaces: List of missing interfaces to update
+    :param: incomplete_interfaces: List of incomplete interfaces to update
+    """
+    for interface_group in interfaces:
+        log("Processing interface group: {}".format(interface_group),
+            level=DEBUG)
+        _potentially_missing = []
+        _potentially_incomplete = []
+        for interface in interface_group:
+            missing, incomplete = _assess_interface(
+                interface=interface, optional=optional,
+                missing_interfaces=_potentially_missing,
+                incomplete_interfaces=_potentially_incomplete)
+            if not missing and not incomplete:
+                break
+        else:
+            # NOTE(jamespage): If an interface group has an incomplete
+            #                  interface then the end user has made a
+            #                  choice as to which interface to use, so
+            #                  don't flag any interfaces as missing.
+            if (not optional and
+                    _potentially_missing and not _potentially_incomplete):
+                formatted_interfaces = [
+                    "'{}'".format(i) for i in _potentially_missing
+                ]
+                missing_interfaces.append(
+                    "{} missing".format(' or '.join(formatted_interfaces))
+                )
+
+            # NOTE(jamespage): Only display interfaces as incomplete if
+            #                  if they are not in the missing interfaces
+            #                  list for this interface group.
+            if _potentially_incomplete:
+                filtered_interfaces = [
+                    i for i in _potentially_incomplete
+                    if i not in _potentially_missing
+                ]
+                formatted_interfaces = [
+                    "'{}'".format(i) for i in filtered_interfaces
+                ]
+                incomplete_interfaces.append(
+                    "{} incomplete".format(' or '.join(formatted_interfaces))
+                )
 
 
 @when('ha.connected')
@@ -359,3 +441,52 @@ def cluster_connected(hacluster):
     vip = config('vip')
     hacluster.add_vip('vault', vip)
     hacluster.bind_resources()
+
+
+def _assess_status():
+    """Assess status of relations and services for local unit"""
+    health = None
+    if service_running('vault'):
+        health = get_vault_health()
+        application_version_set(health.get('version'))
+
+    _missing_interfaces = []
+    _incomplete_interfaces = []
+
+    _assess_interface_groups(REQUIRED_INTERFACES, optional=False,
+                             missing_interfaces=_missing_interfaces,
+                             incomplete_interfaces=_incomplete_interfaces)
+
+    _assess_interface_groups(OPTIONAL_INTERFACES, optional=True,
+                             missing_interfaces=_missing_interfaces,
+                             incomplete_interfaces=_incomplete_interfaces)
+
+    if _missing_interfaces or _incomplete_interfaces:
+        state = 'blocked' if _missing_interfaces else 'waiting'
+        status_set(state, ', '.join(_missing_interfaces +
+                                    _incomplete_interfaces))
+        return
+
+    if not service_running('vault'):
+        status_set('blocked', 'Vault service not running')
+        return
+
+    if not health['initialized']:
+        status_set('blocked', 'Vault needs to be initialized')
+        return
+
+    if health['sealed']:
+        status_set('blocked', 'Unit is sealed')
+        return
+
+    if config('disable-mlock'):
+        status_set(
+            'active',
+            'WARNING: DISABLE-MLOCK IS SET -- SECRETS MAY BE LEAKED'
+        )
+    else:
+        status_set(
+            'active',
+            'Unit is ready '
+            '(active: {})'.format(str(not health['standby']).lower())
+        )

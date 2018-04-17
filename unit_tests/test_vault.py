@@ -26,6 +26,26 @@ class TestHandlers(unittest.TestCase):
         "cluster_id": "1ea3d74c-3819-fbaf-f780-bae0babc998f"
     }
 
+    _health_response_needs_init = {
+        "initialized": False,
+        "sealed": False,
+        "standby": False,
+        "server_time_utc": 1523952750,
+        "version": "0.9.0",
+        "cluster_name": "vault-cluster-9dd8dd12",
+        "cluster_id": "1ea3d74c-3819-fbaf-f780-bae0babc998f"
+    }
+
+    _health_response_sealed = {
+        "initialized": True,
+        "sealed": True,
+        "standby": False,
+        "server_time_utc": 1523952750,
+        "version": "0.9.0",
+        "cluster_name": "vault-cluster-9dd8dd12",
+        "cluster_id": "1ea3d74c-3819-fbaf-f780-bae0babc998f"
+    }
+
     def setUp(self):
         super(TestHandlers, self).setUp()
         self.patches = [
@@ -87,13 +107,6 @@ class TestHandlers(unittest.TestCase):
             'disable_mlock': False,
             'ssl_available': True,
         }
-        status_set_calls = [
-            mock.call('maintenance', 'creating vault config'),
-            mock.call('maintenance', 'creating vault unit file'),
-            mock.call('maintenance', 'starting vault'),
-            mock.call('maintenance', 'opening vault port'),
-            mock.call('active', '=^_^='),
-        ]
         render_calls = [
             mock.call(
                 'vault.hcl.j2',
@@ -107,7 +120,6 @@ class TestHandlers(unittest.TestCase):
                 perms=0o644)
         ]
         self.open_port.assert_called_once_with(8200)
-        self.status_set.assert_has_calls(status_set_calls)
         self.render.assert_has_calls(render_calls)
 
         # Check flipping disable-mlock makes it to the context
@@ -290,6 +302,13 @@ class TestHandlers(unittest.TestCase):
         self.unit_private_ip.return_value = '1.2.3.4'
         self.assertEqual(handlers.get_api_url(), 'http://1.2.3.4:8200')
 
+    def test_cluster_connected(self):
+        self.config.return_value = '10.1.1.1'
+        hacluster_mock = mock.MagicMock()
+        handlers.cluster_connected(hacluster_mock)
+        hacluster_mock.add_vip.assert_called_once_with('vault', '10.1.1.1')
+        hacluster_mock.bind_resources.assert_called_once_with()
+
     @patch.object(handlers, 'get_api_url')
     @patch.object(handlers, 'requests')
     def test_get_vault_health(self, requests, get_api_url):
@@ -303,24 +322,87 @@ class TestHandlers(unittest.TestCase):
             "https://vault.demo.com:8200/v1/sys/health")
         mock_response.json.assert_called_once()
 
+    @patch.object(handlers, '_assess_interface_groups')
     @patch.object(handlers, 'get_vault_health')
-    def test_assess_status(self, get_vault_health):
+    def test_assess_status(self, get_vault_health,
+                           _assess_interface_groups):
         get_vault_health.return_value = self._health_response
+        _assess_interface_groups.return_value = []
+        self.config.return_value = False
         self.service_running.return_value = True
         handlers._assess_status()
         self.application_version_set.assert_called_with(
             self._health_response['version'])
+        self.status_set.assert_called_with(
+            'active', 'Unit is ready (active: true)')
+        self.config.assert_called_with('disable-mlock')
+        _assess_interface_groups.assert_has_calls([
+            mock.call(handlers.REQUIRED_INTERFACES,
+                      optional=False,
+                      missing_interfaces=mock.ANY,
+                      incomplete_interfaces=mock.ANY),
+            mock.call(handlers.OPTIONAL_INTERFACES,
+                      optional=True,
+                      missing_interfaces=mock.ANY,
+                      incomplete_interfaces=mock.ANY),
+        ])
 
+    @patch.object(handlers, '_assess_interface_groups')
     @patch.object(handlers, 'get_vault_health')
-    def test_assess_status_not_running(self, get_vault_health):
+    def test_assess_status_not_running(self, get_vault_health,
+                                       _assess_interface_groups):
         get_vault_health.return_value = self._health_response
         self.service_running.return_value = False
         handlers._assess_status()
         self.application_version_set.assert_not_called()
+        self.status_set.assert_called_with(
+            'blocked', 'Vault service not running')
 
-    def test_cluster_connected(self):
-        self.config.return_value = '10.1.1.1'
-        hacluster_mock = mock.MagicMock()
-        handlers.cluster_connected(hacluster_mock)
-        hacluster_mock.add_vip.assert_called_once_with('vault', '10.1.1.1')
-        hacluster_mock.bind_resources.assert_called_once_with()
+    @patch.object(handlers, '_assess_interface_groups')
+    @patch.object(handlers, 'get_vault_health')
+    def test_assess_status_vault_init(self, get_vault_health,
+                                      _assess_interface_groups):
+        get_vault_health.return_value = self._health_response_needs_init
+        _assess_interface_groups.return_value = []
+        self.service_running.return_value = True
+        handlers._assess_status()
+        self.status_set.assert_called_with(
+            'blocked', 'Vault needs to be initialized')
+
+    @patch.object(handlers, '_assess_interface_groups')
+    @patch.object(handlers, 'get_vault_health')
+    def test_assess_status_vault_sealed(self, get_vault_health,
+                                        _assess_interface_groups):
+        get_vault_health.return_value = self._health_response_sealed
+        _assess_interface_groups.return_value = []
+        self.service_running.return_value = True
+        handlers._assess_status()
+        self.status_set.assert_called_with(
+            'blocked', 'Unit is sealed')
+
+    @patch.object(handlers, 'is_flag_set')
+    def test_assess_interface_groups(self, is_flag_set):
+        flags = {
+            'db.master.available': True,
+            'db.connected': True,
+            'etcd.connected': True,
+            'baz.connected': True,
+        }
+        is_flag_set.side_effect = lambda flag: flags.get(flag, False)
+
+        missing_interfaces = []
+        incomplete_interfaces = []
+        handlers._assess_interface_groups(
+            [['db.master', 'shared-db'],
+             ['etcd'],
+             ['foo', 'bar'],
+             ['baz', 'boo']],
+            optional=False,
+            missing_interfaces=missing_interfaces,
+            incomplete_interfaces=incomplete_interfaces
+        )
+        self.assertEqual(missing_interfaces,
+                         ["'foo' or 'bar' missing"])
+        self.assertEqual(incomplete_interfaces,
+                         ["'etcd' incomplete",
+                          "'baz' incomplete"])
