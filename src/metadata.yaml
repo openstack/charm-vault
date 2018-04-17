@@ -16,6 +16,8 @@ series:
   - bionic
 tags:
   - security
+extra-bindings:
+  access:
 requires:
   db:
     interface: pgsql
@@ -30,3 +32,6 @@ provides:
   nrpe-external-master:
     interface: nrpe-external-master
     scope: container
+peers:
+  cluster:
+    interface: vault-ha

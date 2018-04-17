@@ -1,4 +1,5 @@
 import base64
+import functools
 import hvac
 import psycopg2
 import requests
@@ -23,6 +24,7 @@ from charmhelpers.core.hookenv import (
     application_version_set,
     atexit,
     local_unit,
+    network_get_primary_address,
 )
 
 from charmhelpers.core.host import (
@@ -136,9 +138,10 @@ def configure_vault(context):
                                      key=context['etcd_tls_key_file'],
                                      cert=context['etcd_tls_cert_file'],
                                      ca=context['etcd_tls_ca_file'])
-        context['vault_api_url'] = get_api_url()
-        log("Etcd detected, setting vault_api_url to {}".format(
-            context['vault_api_url']))
+        context['api_addr'] = get_api_url()
+        context['cluster_addr'] = get_cluster_url()
+        log("Etcd detected, setting api_addr to {}".format(
+            context['api_addr']))
     else:
         log("Etcd not detected", level=DEBUG)
     log("Rendering vault.hcl.j2", level=DEBUG)
@@ -162,13 +165,25 @@ def configure_vault(context):
     open_port(8200)
 
 
-def get_api_url():
+def binding_address(binding):
+    try:
+        return network_get_primary_address(binding)
+    except NotImplementedError:
+        return unit_private_ip()
+
+
+def get_vault_url(binding, port):
     protocol = 'http'
-    port = '8200'
-    ip = unit_private_ip()
+    ip = binding_address(binding)
     if is_state('vault.ssl.available'):
         protocol = 'https'
     return '{}://{}:{}'.format(protocol, ip, port)
+
+
+get_api_url = functools.partial(get_vault_url,
+                                binding='access', port=8200)
+get_cluster_url = functools.partial(get_vault_url,
+                                    binding='cluster', port=8201)
 
 
 @when('snap.installed.vault')

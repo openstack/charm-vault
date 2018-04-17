@@ -18,3 +18,10 @@ deploying on bionic, you'll need to deploy a 9.x version of PostgreSQL.
 After deploying and relating the charm to postgresql, install
 the vault snap locally and use "vault init" to create the
 master key shards and the root token, and store them safely.
+
+## Network Spaces support
+
+The vault charm directly supports network binding via the 'access'
+extra-binding and the 'cluster' peer relation. These allow the Vault
+API and inter-unit Cluster addresses to be configured using Juju
+network spaces.

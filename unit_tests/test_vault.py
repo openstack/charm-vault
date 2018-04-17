@@ -64,6 +64,7 @@ class TestHandlers(unittest.TestCase):
             'unit_private_ip',
             'application_version_set',
             'local_unit',
+            'network_get_primary_address',
         ]
         self.patch_all()
 
@@ -218,12 +219,15 @@ class TestHandlers(unittest.TestCase):
         ])
 
     @patch.object(handlers, 'save_etcd_client_credentials')
+    @patch.object(handlers, 'get_cluster_url')
     @patch.object(handlers, 'can_restart')
     @patch.object(handlers, 'get_api_url')
     def test_configure_vault_etcd(self, get_api_url, can_restart,
+                                  get_cluster_url,
                                   save_etcd_client_credentials):
         can_restart.return_value = True
-        get_api_url.return_value = 'http://this-unit'
+        get_api_url.return_value = 'http://this-unit:8200'
+        get_cluster_url.return_value = 'http://this-unit:8201'
         self.config.return_value = {'disable-mlock': False}
         etcd_mock = mock.MagicMock()
         etcd_mock.connection_string.return_value = 'http://etcd'
@@ -237,7 +241,8 @@ class TestHandlers(unittest.TestCase):
             'etcd_tls_ca_file': '/var/snap/vault/common/etcd-ca.pem',
             'etcd_tls_cert_file': '/var/snap/vault/common/etcd-cert.pem',
             'etcd_tls_key_file': '/var/snap/vault/common/etcd.key',
-            'vault_api_url': 'http://this-unit'}
+            'api_addr': 'http://this-unit:8200',
+            'cluster_addr': 'http://this-unit:8201'}
         render_calls = [
             mock.call(
                 'vault.hcl.j2',
@@ -294,13 +299,27 @@ class TestHandlers(unittest.TestCase):
 
     def test_get_api_url_ssl(self):
         self.is_state.return_value = True
-        self.unit_private_ip.return_value = '1.2.3.4'
+        self.network_get_primary_address.return_value = '1.2.3.4'
         self.assertEqual(handlers.get_api_url(), 'https://1.2.3.4:8200')
+        self.network_get_primary_address.assert_called_with('access')
 
     def test_get_api_url_nossl(self):
         self.is_state.return_value = False
-        self.unit_private_ip.return_value = '1.2.3.4'
+        self.network_get_primary_address.return_value = '1.2.3.4'
         self.assertEqual(handlers.get_api_url(), 'http://1.2.3.4:8200')
+        self.network_get_primary_address.assert_called_with('access')
+
+    def test_get_cluster_url_ssl(self):
+        self.is_state.return_value = True
+        self.network_get_primary_address.return_value = '1.2.3.4'
+        self.assertEqual(handlers.get_cluster_url(), 'https://1.2.3.4:8201')
+        self.network_get_primary_address.assert_called_with('cluster')
+
+    def test_get_cluster_url_nossl(self):
+        self.is_state.return_value = False
+        self.network_get_primary_address.return_value = '1.2.3.4'
+        self.assertEqual(handlers.get_cluster_url(), 'http://1.2.3.4:8201')
+        self.network_get_primary_address.assert_called_with('cluster')
 
     def test_cluster_connected(self):
         self.config.return_value = '10.1.1.1'

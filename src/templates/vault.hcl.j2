@@ -1,5 +1,8 @@
-{%- if vault_api_url %}
-api_addr = "{{ vault_api_url }}"
+{%- if api_addr %}
+api_addr = "{{ api_addr }}"
+{%- endif %}
+{%- if cluster_addr %}
+cluster_addr = "{{ cluster_addr }}"
 {%- endif %}
 {%- if disable_mlock %}
 disable_mlock = true
@@ -19,21 +22,19 @@ storage "mysql" {
 {%- if etcd_conn %}
 ha_storage "etcd" {
   ha_enabled = "true"
-  address  = "{{ etcd_conn }}"
-  tls_ca_file  = "{{ etcd_tls_ca_file }}"
-  tls_cert_file  = "{{ etcd_tls_cert_file }}"
-  tls_key_file  = "{{ etcd_tls_key_file }}"
+  address = "{{ etcd_conn }}"
+  tls_ca_file = "{{ etcd_tls_ca_file }}"
+  tls_cert_file = "{{ etcd_tls_cert_file }}"
+  tls_key_file = "{{ etcd_tls_key_file }}"
   etcd_api = "v3"
 }
 {%- endif %}
 listener "tcp" {
- address = "0.0.0.0:8200"
+  address = "0.0.0.0:8200"
 {%- if ssl_available %}
- tls_cert_file = "/var/snap/vault/common/vault.crt"
- tls_key_file  = "/var/snap/vault/common/vault.key"
+  tls_cert_file = "/var/snap/vault/common/vault.crt"
+  tls_key_file  = "/var/snap/vault/common/vault.key"
 {%- else %}
- tls_disable = 1
+  tls_disable = 1
 {%- endif %}
 }
-
-
