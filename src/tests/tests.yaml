@@ -6,6 +6,7 @@ configure:
 gate_bundles:
   - xenial-postgres
   - xenial-mysql
+  - bionic-postgres
 smoke_bundles:
   - xenial-mysql
 dev_bundles:
