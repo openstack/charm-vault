@@ -42,3 +42,8 @@ options:
     default: ""
     description: >-
       The SSL Root CA certificate, base64-encoded.
+  vip:
+    type: string
+    default:
+    description: |
+      Virtual IP to use api traffic
