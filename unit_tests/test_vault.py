@@ -43,6 +43,7 @@ class TestHandlers(unittest.TestCase):
             'render',
             'unit_private_ip',
             'application_version_set',
+            'local_unit',
         ]
         self.patch_all()
 
@@ -139,10 +140,20 @@ class TestHandlers(unittest.TestCase):
     @patch.object(handlers, 'configure_vault')
     def test_configure_vault_msql(self, configure_vault):
         mysql = mock.MagicMock()
+        mysql.allowed_units.return_value = ['vault/0']
+        self.local_unit.return_value = 'vault/0'
         handlers.configure_vault_mysql(mysql)
         configure_vault.assert_called_once_with({
             'storage_name': 'mysql',
             'mysql_db_relation': mysql})
+
+    @patch.object(handlers, 'configure_vault')
+    def test_configure_vault_msql_noacl(self, configure_vault):
+        mysql = mock.MagicMock()
+        mysql.allowed_units.return_value = ['vault/1']
+        self.local_unit.return_value = 'vault/0'
+        handlers.configure_vault_mysql(mysql)
+        configure_vault.assert_not_called()
 
     def test_disable_mlock_changed(self):
         handlers.disable_mlock_changed()

@@ -21,6 +21,7 @@ from charmhelpers.core.hookenv import (
     unit_private_ip,
     application_version_set,
     atexit,
+    local_unit,
 )
 
 from charmhelpers.core.host import (
@@ -173,6 +174,10 @@ def configure_vault_psql(psql):
 @when('shared-db.available')
 @when('vault.ssl.configured')
 def configure_vault_mysql(mysql):
+    if local_unit() not in mysql.allowed_units():
+        log("Deferring vault configuration until"
+            " MySQL access is granted", level=DEBUG)
+        return
     context = {
         'storage_name': 'mysql',
         'mysql_db_relation': mysql,
