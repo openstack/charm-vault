@@ -212,7 +212,7 @@ def mysql_setup(database):
 @when_not('vault.schema.created')
 def create_vault_table(pgsql):
     status_set('maintenance', 'connecting to database')
-    conn = psycopg2.connect(pgsql.master)
+    conn = psycopg2.connect(str(pgsql.master))
     cur = conn.cursor()
     status_set('maintenance', 'creating vault table')
     cur.execute(VAULT_TABLE_DDL)

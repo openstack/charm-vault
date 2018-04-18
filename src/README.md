@@ -11,7 +11,9 @@ SSH credentials, and more.
 ## About the Charm
 
 This charm installs Vault from the Ubuntu Snap Store and
-supports the PostgreSQL storage backend only.
+supports the PostgreSQL and MySQL storage backends. Note that Vault itself
+does not support PostgreSQL 10, so neither does this charm. If you're
+deploying on bionic, you'll need to deploy a 9.x version of PostgreSQL.
 
 After deploying and relating the charm to postgresql, install
 the vault snap locally and use "vault init" to create the
