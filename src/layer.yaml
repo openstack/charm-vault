@@ -11,9 +11,6 @@ options:
     packages:
       - python3-psycopg2
       - libffi-dev
-  snap:
-    vault:
-      channel: stable
 resources:
   vault:
     type: file

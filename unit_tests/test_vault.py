@@ -65,6 +65,10 @@ class TestHandlers(unittest.TestCase):
             'application_version_set',
             'local_unit',
             'network_get_primary_address',
+            'snap',
+            'is_flag_set',
+            'set_flag',
+            'clear_flag',
         ]
         self.patch_all()
 
@@ -345,6 +349,7 @@ class TestHandlers(unittest.TestCase):
     @patch.object(handlers, 'get_vault_health')
     def test_assess_status(self, get_vault_health,
                            _assess_interface_groups):
+        self.is_flag_set.return_value = False
         get_vault_health.return_value = self._health_response
         _assess_interface_groups.return_value = []
         self.config.return_value = False
@@ -366,10 +371,20 @@ class TestHandlers(unittest.TestCase):
                       incomplete_interfaces=mock.ANY),
         ])
 
+    def test_assess_status_invalid_channel(self):
+        self.is_flag_set.return_value = True
+        self.config.return_value = 'foorbar'
+        handlers._assess_status()
+        self.status_set.assert_called_with(
+            'blocked', 'Invalid snap channel configured: foorbar')
+        self.is_flag_set.assert_called_with('snap.channel.invalid')
+        self.config.assert_called_with('channel')
+
     @patch.object(handlers, '_assess_interface_groups')
     @patch.object(handlers, 'get_vault_health')
     def test_assess_status_not_running(self, get_vault_health,
                                        _assess_interface_groups):
+        self.is_flag_set.return_value = False
         get_vault_health.return_value = self._health_response
         self.service_running.return_value = False
         handlers._assess_status()
@@ -381,6 +396,7 @@ class TestHandlers(unittest.TestCase):
     @patch.object(handlers, 'get_vault_health')
     def test_assess_status_vault_init(self, get_vault_health,
                                       _assess_interface_groups):
+        self.is_flag_set.return_value = False
         get_vault_health.return_value = self._health_response_needs_init
         _assess_interface_groups.return_value = []
         self.service_running.return_value = True
@@ -392,6 +408,7 @@ class TestHandlers(unittest.TestCase):
     @patch.object(handlers, 'get_vault_health')
     def test_assess_status_vault_sealed(self, get_vault_health,
                                         _assess_interface_groups):
+        self.is_flag_set.return_value = False
         get_vault_health.return_value = self._health_response_sealed
         _assess_interface_groups.return_value = []
         self.service_running.return_value = True
@@ -399,15 +416,14 @@ class TestHandlers(unittest.TestCase):
         self.status_set.assert_called_with(
             'blocked', 'Unit is sealed')
 
-    @patch.object(handlers, 'is_flag_set')
-    def test_assess_interface_groups(self, is_flag_set):
+    def test_assess_interface_groups(self):
         flags = {
             'db.master.available': True,
             'db.connected': True,
             'etcd.connected': True,
             'baz.connected': True,
         }
-        is_flag_set.side_effect = lambda flag: flags.get(flag, False)
+        self.is_flag_set.side_effect = lambda flag: flags.get(flag, False)
 
         missing_interfaces = []
         incomplete_interfaces = []
@@ -425,3 +441,60 @@ class TestHandlers(unittest.TestCase):
         self.assertEqual(incomplete_interfaces,
                          ["'etcd' incomplete",
                           "'baz' incomplete"])
+
+    def test_snap_install(self):
+        self.config.return_value = None
+        handlers.snap_install()
+        self.snap.install.assert_called_with('vault', channel='stable')
+        self.config.assert_called_with('channel')
+        self.clear_flag.assert_called_with('snap.channel.invalid')
+
+    def test_snap_install_channel_set(self):
+        self.config.return_value = 'edge'
+        handlers.snap_install()
+        self.snap.install.assert_called_with('vault', channel='edge')
+        self.config.assert_called_with('channel')
+        self.clear_flag.assert_called_with('snap.channel.invalid')
+
+    def test_snap_install_invalid_channel(self):
+        self.config.return_value = 'foorbar'
+        handlers.snap_install()
+        self.snap.install.assert_not_called()
+        self.config.assert_called_with('channel')
+        self.set_flag.assert_called_with('snap.channel.invalid')
+
+    @patch.object(handlers, 'can_restart')
+    def test_snap_refresh_restartable(self, can_restart):
+        self.config.return_value = 'edge'
+        can_restart.return_value = True
+        handlers.snap_refresh()
+        self.snap.refresh.assert_called_with('vault', channel='edge')
+        self.config.assert_called_with('channel')
+        self.service_restart.assert_called_with('vault')
+        self.clear_flag.assert_called_with('snap.channel.invalid')
+
+    @patch.object(handlers, 'can_restart')
+    def test_snap_refresh_not_restartable(self, can_restart):
+        self.config.return_value = 'edge'
+        can_restart.return_value = False
+        handlers.snap_refresh()
+        self.snap.refresh.assert_called_with('vault', channel='edge')
+        self.config.assert_called_with('channel')
+        self.service_restart.assert_not_called()
+        self.clear_flag.assert_called_with('snap.channel.invalid')
+
+    def test_snap_refresh_invalid_channel(self):
+        self.config.return_value = 'foorbar'
+        handlers.snap_refresh()
+        self.snap.refresh.assert_not_called()
+        self.config.assert_called_with('channel')
+        self.set_flag.assert_called_with('snap.channel.invalid')
+
+    def test_validate_snap_channel(self):
+        self.assertTrue(handlers.validate_snap_channel('stable'))
+        self.assertTrue(handlers.validate_snap_channel('0.10/stable'))
+        self.assertTrue(handlers.validate_snap_channel('edge'))
+        self.assertTrue(handlers.validate_snap_channel('beta'))
+        self.assertTrue(handlers.validate_snap_channel('candidate'))
+        self.assertFalse(handlers.validate_snap_channel('foobar'))
+        self.assertFalse(handlers.validate_snap_channel('0.10/foobar'))

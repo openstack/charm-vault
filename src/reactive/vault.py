@@ -52,8 +52,12 @@ from charms.reactive.relations import (
 )
 
 from charms.reactive.flags import (
-    is_flag_set
+    is_flag_set,
+    set_flag,
+    clear_flag,
 )
+
+from charms.layer import snap
 
 # See https://www.vaultproject.io/docs/configuration/storage/postgresql.html
 
@@ -119,6 +123,44 @@ def save_etcd_client_credentials(etcd, key, cert, ca):
     write_file(key, credentials['client_key'], perms=0o600)
     write_file(cert, credentials['client_cert'], perms=0o600)
     write_file(ca, credentials['client_ca'], perms=0o600)
+
+
+def validate_snap_channel(channel):
+    """Validate a provided snap channel
+
+    Any prefix is ignored ('0.10' in '0.10/stable' for example).
+
+    :param: channel: string of the snap channel to validate
+    :returns: boolean: whether provided channel is valid
+    """
+    channel_suffix = channel.split('/')[-1]
+    if channel_suffix not in ('stable', 'candidate', 'beta', 'edge'):
+        return False
+    return True
+
+
+@when_not('snap.installed.vault')
+def snap_install():
+    channel = config('channel') or 'stable'
+    if validate_snap_channel(channel):
+        clear_flag('snap.channel.invalid')
+        snap.install('vault', channel=channel)
+    else:
+        set_flag('snap.channel.invalid')
+
+
+@when('config.changed.channel')
+@when('snap.installed.vault')
+def snap_refresh():
+    channel = config('channel') or 'stable'
+    if validate_snap_channel(channel):
+        clear_flag('snap.channel.invalid')
+        snap.refresh('vault', channel=channel)
+        if can_restart():
+            log("Restarting vault", level=DEBUG)
+            service_restart('vault')
+    else:
+        set_flag('snap.channel.invalid')
 
 
 def configure_vault(context):
@@ -460,6 +502,12 @@ def cluster_connected(hacluster):
 
 def _assess_status():
     """Assess status of relations and services for local unit"""
+    if is_flag_set('snap.channel.invalid'):
+        status_set('blocked',
+                   'Invalid snap channel '
+                   'configured: {}'.format(config('channel')))
+        return
+
     health = None
     if service_running('vault'):
         health = get_vault_health()

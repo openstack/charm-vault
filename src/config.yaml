@@ -47,3 +47,8 @@ options:
     default:
     description: |
       Virtual IP to use api traffic
+  channel:
+    type: string
+    default: stable
+    description: >-
+      The snap channel to install from.
