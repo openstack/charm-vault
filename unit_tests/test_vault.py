@@ -104,6 +104,7 @@ class TestHandlers(unittest.TestCase):
         db_context = {
             'storage_name': 'psql',
             'psql_db_conn': 'myuri'}
+        self.is_flag_set.return_value = False
         self.endpoint_from_flag.return_value = None
         handlers.configure_vault(db_context)
         expected_context = {
@@ -235,6 +236,7 @@ class TestHandlers(unittest.TestCase):
         self.config.return_value = {'disable-mlock': False}
         etcd_mock = mock.MagicMock()
         etcd_mock.connection_string.return_value = 'http://etcd'
+        self.is_flag_set.return_value = True
         self.endpoint_from_flag.return_value = etcd_mock
         self.is_state.return_value = True
         handlers.configure_vault({})
@@ -266,6 +268,7 @@ class TestHandlers(unittest.TestCase):
             cert=expected_context['etcd_tls_cert_file'],
             ca=expected_context['etcd_tls_ca_file'],
         )
+        self.is_flag_set.assert_called_with('etcd.tls.available')
 
     @patch.object(handlers.hvac, 'Client')
     @patch.object(handlers, 'get_api_url')

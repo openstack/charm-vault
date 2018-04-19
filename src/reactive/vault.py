@@ -169,8 +169,9 @@ def configure_vault(context):
     log("Running configure_vault", level=DEBUG)
     context['disable_mlock'] = config()['disable-mlock']
     context['ssl_available'] = is_state('vault.ssl.available')
-    etcd = endpoint_from_flag('etcd.available')
-    if etcd:
+
+    if is_flag_set('etcd.tls.available'):
+        etcd = endpoint_from_flag('etcd.available')
         log("Etcd detected, adding to context", level=DEBUG)
         context['etcd_conn'] = etcd.connection_string()
         context['etcd_tls_ca_file'] = '/var/snap/vault/common/etcd-ca.pem'
