@@ -96,6 +96,14 @@ def ssl_available(config):
     return True
 
 
+def save_etcd_client_credentials(etcd, key, cert, ca):
+    """Save etcd TLS key, cert and ca to disk"""
+    credentials = etcd.get_client_credentials()
+    write_file(key, credentials['client_key'], perms=0o600)
+    write_file(cert, credentials['client_cert'], perms=0o600)
+    write_file(ca, credentials['client_ca'], perms=0o600)
+
+
 def configure_vault(context):
     context['disable_mlock'] = config()['disable-mlock']
     context['ssl_available'] = is_state('vault.ssl.available')
@@ -109,10 +117,10 @@ def configure_vault(context):
         context['etcd_tls_ca_file'] = '/var/snap/vault/common/etcd-ca.pem'
         context['etcd_tls_cert_file'] = '/var/snap/vault/common/etcd-cert.pem'
         context['etcd_tls_key_file'] = '/var/snap/vault/common/etcd.key'
-        etcd.save_client_credentials(
-            context['etcd_tls_key_file'],
-            context['etcd_tls_cert_file'],
-            context['etcd_tls_ca_file'])
+        save_etcd_client_credentials(etcd,
+                                     key=context['etcd_tls_key_file'],
+                                     cert=context['etcd_tls_cert_file'],
+                                     ca=context['etcd_tls_ca_file'])
         context['vault_api_url'] = get_api_url()
         log("Etcd detected, setting vault_api_url to {}".format(
             context['vault_api_url']))

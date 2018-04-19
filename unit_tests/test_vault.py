@@ -186,9 +186,30 @@ class TestHandlers(unittest.TestCase):
         handlers.database_not_ready()
         self.remove_state.assert_called_once_with('vault.schema.created')
 
+    @patch.object(handlers, 'write_file')
+    def test_save_etcd_client_credentials(self, write_file):
+        etcd_mock = mock.MagicMock()
+        etcd_mock.get_client_credentials.return_value = {
+            'client_cert': 'test-cert',
+            'client_key': 'test-key',
+            'client_ca': 'test-ca',
+        }
+        handlers.save_etcd_client_credentials(etcd_mock,
+                                              key='key',
+                                              cert='cert',
+                                              ca='ca')
+        etcd_mock.get_client_credentials.assert_called_once_with()
+        write_file.assert_has_calls([
+            mock.call('key', 'test-key', perms=0o600),
+            mock.call('cert', 'test-cert', perms=0o600),
+            mock.call('ca', 'test-ca', perms=0o600),
+        ])
+
+    @patch.object(handlers, 'save_etcd_client_credentials')
     @patch.object(handlers, 'can_restart')
     @patch.object(handlers, 'get_api_url')
-    def test_configure_vault_etcd(self, get_api_url, can_restart):
+    def test_configure_vault_etcd(self, get_api_url, can_restart,
+                                  save_etcd_client_credentials):
         can_restart.return_value = True
         get_api_url.return_value = 'http://this-unit'
         self.config.return_value = {'disable-mlock': False}
@@ -218,6 +239,12 @@ class TestHandlers(unittest.TestCase):
                 perms=0o644)
         ]
         self.render.assert_has_calls(render_calls)
+        save_etcd_client_credentials.assert_called_with(
+            etcd_mock,
+            key=expected_context['etcd_tls_key_file'],
+            cert=expected_context['etcd_tls_cert_file'],
+            ca=expected_context['etcd_tls_ca_file'],
+        )
 
     @patch.object(handlers.hvac, 'Client')
     @patch.object(handlers, 'get_api_url')
