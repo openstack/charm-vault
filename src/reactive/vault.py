@@ -16,6 +16,7 @@ from charmhelpers.contrib.charmsupport.nrpe import (
 
 from charmhelpers.core.hookenv import (
     DEBUG,
+    ERROR,
     config,
     log,
     open_port,
@@ -404,6 +405,29 @@ def nagios_servicegroups_changed():
     remove_state('vault.nrpe.configured')
 
 
+@when('ha.connected')
+def cluster_connected(hacluster):
+    """Configure HA resources in corosync"""
+    vip = config('vip')
+    dns_record = config('dns-ha-access-record')
+    if vip and dns_record:
+        set_flag('config.dns_vip.invalid')
+        log("Unsupported configuration. vip and dns-ha cannot both be set",
+            level=ERROR)
+        return
+    else:
+        clear_flag('config.dns_vip.invalid')
+    if vip:
+        hacluster.add_vip('vault', vip)
+    elif dns_record:
+        try:
+            ip = network_get_primary_address('access')
+        except NotImplementedError:
+            ip = unit_private_ip()
+        hacluster.add_dnsha('vault', ip, dns_record, 'access')
+    hacluster.bind_resources()
+
+
 @when('snap.installed.vault')
 def prime_assess_status():
     atexit(_assess_status)
@@ -492,20 +516,16 @@ def _assess_interface_groups(interfaces, optional,
                 )
 
 
-@when('ha.connected')
-def cluster_connected(hacluster):
-    """Configure HA resources in corosync"""
-    vip = config('vip')
-    hacluster.add_vip('vault', vip)
-    hacluster.bind_resources()
-
-
 def _assess_status():
     """Assess status of relations and services for local unit"""
     if is_flag_set('snap.channel.invalid'):
         status_set('blocked',
                    'Invalid snap channel '
                    'configured: {}'.format(config('channel')))
+        return
+    if is_flag_set('config.dns_vip.invalid'):
+        status_set('blocked',
+                   'vip and dns-ha-access-record configured')
         return
 
     health = None
