@@ -53,6 +53,7 @@ class TestHandlers(unittest.TestCase):
             'endpoint_from_flag',
             'is_state',
             'log',
+            'network_get_primary_address',
             'open_port',
             'service_restart',
             'service_running',
@@ -328,13 +329,6 @@ class TestHandlers(unittest.TestCase):
         self.assertEqual(handlers.get_cluster_url(), 'http://1.2.3.4:8201')
         self.network_get_primary_address.assert_called_with('cluster')
 
-    def test_cluster_connected(self):
-        self.config.return_value = '10.1.1.1'
-        hacluster_mock = mock.MagicMock()
-        handlers.cluster_connected(hacluster_mock)
-        hacluster_mock.add_vip.assert_called_once_with('vault', '10.1.1.1')
-        hacluster_mock.bind_resources.assert_called_once_with()
-
     @patch.object(handlers, 'get_api_url')
     @patch.object(handlers, 'requests')
     def test_get_vault_health(self, requests, get_api_url):
@@ -375,13 +369,26 @@ class TestHandlers(unittest.TestCase):
         ])
 
     def test_assess_status_invalid_channel(self):
-        self.is_flag_set.return_value = True
+        statuses = {
+            'snap.channel.invalid': True,
+            'config.dns_vip.invalid': False}
+        self.is_flag_set.side_effect = lambda x: statuses[x]
         self.config.return_value = 'foorbar'
         handlers._assess_status()
         self.status_set.assert_called_with(
             'blocked', 'Invalid snap channel configured: foorbar')
         self.is_flag_set.assert_called_with('snap.channel.invalid')
         self.config.assert_called_with('channel')
+
+    def test_assess_status_invalid_haconfig(self):
+        statuses = {
+            'snap.channel.invalid': False,
+            'config.dns_vip.invalid': True}
+        self.is_flag_set.side_effect = lambda x: statuses[x]
+        handlers._assess_status()
+        self.status_set.assert_called_with(
+            'blocked', 'vip and dns-ha-access-record configured')
+        self.is_flag_set.assert_called_with('config.dns_vip.invalid')
 
     @patch.object(handlers, '_assess_interface_groups')
     @patch.object(handlers, 'get_vault_health')
@@ -501,3 +508,38 @@ class TestHandlers(unittest.TestCase):
         self.assertTrue(handlers.validate_snap_channel('candidate'))
         self.assertFalse(handlers.validate_snap_channel('foobar'))
         self.assertFalse(handlers.validate_snap_channel('0.10/foobar'))
+
+    def test_cluster_connected_vip(self):
+        charm_config = {
+            'vip': '10.1.1.1'}
+        self.config.side_effect = lambda x: charm_config.get(x)
+        hacluster_mock = mock.MagicMock()
+        handlers.cluster_connected(hacluster_mock)
+        hacluster_mock.add_vip.assert_called_once_with('vault', '10.1.1.1')
+        hacluster_mock.bind_resources.assert_called_once_with()
+        self.clear_flag.assert_called_once_with('config.dns_vip.invalid')
+
+    def test_cluster_connected_dnsha(self):
+        charm_config = {
+            'dns-ha-access-record': 'myrecord.mycopany.co.uk'}
+        self.config.side_effect = lambda x: charm_config.get(x)
+        self.network_get_primary_address.return_value = '10.1.100.1'
+        hacluster_mock = mock.MagicMock()
+        handlers.cluster_connected(hacluster_mock)
+        hacluster_mock.add_dnsha.assert_called_once_with(
+            'vault', '10.1.100.1', 'myrecord.mycopany.co.uk', 'access')
+        hacluster_mock.bind_resources.assert_called_once_with()
+        self.clear_flag.assert_called_once_with('config.dns_vip.invalid')
+
+    def test_cluster_connected_vip_and_dnsha(self):
+        charm_config = {
+            'vip': '10.1.1.1',
+            'dns-ha-access-record': 'myrecord.mycopany.co.uk'}
+        self.config.side_effect = lambda x: charm_config.get(x)
+        self.network_get_primary_address.return_value = '10.1.100.1'
+        hacluster_mock = mock.MagicMock()
+        handlers.cluster_connected(hacluster_mock)
+        self.assertFalse(hacluster_mock.add_vip.called)
+        self.assertFalse(hacluster_mock.add_dnsha.called)
+        self.assertFalse(hacluster_mock.bind_resources.called)
+        self.set_flag.assert_called_once_with('config.dns_vip.invalid')
