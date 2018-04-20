@@ -38,3 +38,9 @@ listener "tcp" {
   tls_disable = 1
 {%- endif %}
 }
+
+# Localhost only listener for charm access to vault.
+listener "tcp" {
+  address = "127.0.0.1:8220"
+  tls_disable = 1
+}

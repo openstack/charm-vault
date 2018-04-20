@@ -1,11 +1,13 @@
 includes:
  - layer:basic
  - layer:snap
+ - layer:leadership
  - interface:nrpe-external-master
  - interface:pgsql
  - interface:mysql-shared
  - interface:etcd
  - interface:hacluster
+ - interface:vault-kv
 options:
   basic:
     packages:

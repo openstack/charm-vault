@@ -1,6 +1,7 @@
 import base64
 import psycopg2
 import subprocess
+import tenacity
 
 
 from charmhelpers.contrib.charmsupport.nrpe import (
@@ -56,6 +57,7 @@ from charms.reactive.flags import (
 )
 
 from charms.layer import snap
+
 import lib.charm.vault as vault
 
 # See https://www.vaultproject.io/docs/configuration/storage/postgresql.html
@@ -365,6 +367,99 @@ def file_change_auto_unlock_mode():
     vault.opportunistic_restart()
     if config('auto-unlock'):
         vault.prepare_vault()
+
+
+@when('leadership.is_leader')
+@when('endpoint.secrets.new-request')
+def configure_secrets_backend():
+    """ Process requests for setup and access to simple kv secret backends """
+    @tenacity.retry(wait=tenacity.wait_exponential(multiplier=1, max=10),
+                    stop=tenacity.stop_after_attempt(10),
+                    reraise=True)
+    def _check_vault_status(client):
+        if (not service_running('vault') or
+                not client.is_initialized() or
+                client.is_sealed()):
+            return False
+        return True
+
+    # NOTE: use localhost listener as policy only allows 127.0.0.1 to
+    #       administer the local vault instances via the charm
+    client = vault.get_client(url=vault.VAULT_LOCALHOST_URL)
+
+    status_ok = _check_vault_status(client)
+    if not status_ok:
+        log('Unable to process new secret backend requests,'
+            ' deferring until vault is fully configured', level=DEBUG)
+        return
+
+    charm_role_id = vault.get_local_charm_access_role_id()
+    if charm_role_id is None:
+        log('Charm access to vault not configured, deferring'
+            ' secrets backend setup', level=DEBUG)
+        return
+    client.auth_approle(charm_role_id)
+
+    secrets = endpoint_from_flag('endpoint.secrets.new-request')
+    requests = secrets.requests()
+
+    # Configure KV secret backends
+    backends = set([request['secret_backend']
+                    for request in requests])
+    for backend in backends:
+        if not backend.startswith('charm-'):
+            continue
+        vault.configure_secret_backend(client, name=backend)
+
+    # Configure AppRoles for application unit access
+    for request in requests:
+        # NOTE: backends must start with charm-
+        backend_name = request['secret_backend']
+        if not backend_name.startswith('charm-'):
+            continue
+
+        unit = request['unit']
+        hostname = request['hostname']
+        access_address = request['access_address']
+        isolated = request['isolated']
+        unit_name = unit.unit_name.replace('/', '-')
+        policy_name = approle_name = 'charm-{}'.format(unit_name)
+
+        if isolated:
+            policy_template = vault.SECRET_BACKEND_HCL
+        else:
+            policy_template = vault.SECRET_BACKEND_SHARED_HCL
+
+        vault.configure_policy(
+            client,
+            name=policy_name,
+            hcl=policy_template.format(backend=backend_name,
+                                       hostname=hostname)
+        )
+
+        approle_id = vault.configure_approle(
+            client,
+            name=approle_name,
+            cidr='{}/32'.format(access_address),
+            policies=[policy_name])
+
+        secrets.set_role_id(unit=unit,
+                            role_id=approle_id)
+
+    clear_flag('endpoint.secrets.new-request')
+
+
+@when('secrets.connected')
+def send_vault_url_and_ca():
+    secrets = endpoint_from_flag('secrets.connected')
+    if is_flag_set('ha.available'):
+        vault_url = vault.get_api_url(address=config('vip'))
+    else:
+        vault_url = vault.get_api_url()
+    secrets.publish_url(vault_url=vault_url)
+
+    if config('ssl-ca'):
+        secrets.publish_ca(vault_ca=config('ssl-ca'))
 
 
 @when('snap.installed.vault')

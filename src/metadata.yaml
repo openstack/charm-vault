@@ -32,6 +32,8 @@ provides:
   nrpe-external-master:
     interface: nrpe-external-master
     scope: container
+  secrets:
+    interface: vault-kv
 peers:
   cluster:
     interface: vault-ha

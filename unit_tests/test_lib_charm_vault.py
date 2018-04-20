@@ -176,7 +176,7 @@ class TestLibCharmVault(unit_tests.test_utils.CharmTestCase):
         self.assertEqual(vault.get_vault_health(),
                          self._health_response)
         requests.get.assert_called_with(
-            "https://vault.demo.com:8200/v1/sys/health")
+            "http://127.0.0.1:8220/v1/sys/health")
         mock_response.json.assert_called_once()
 
     @patch.object(vault, 'setup_charm_vault_access')
@@ -315,3 +315,46 @@ class TestLibCharmVault(unit_tests.test_utils.CharmTestCase):
         can_restart.return_value = False
         vault.opportunistic_restart()
         service_start.assert_called_once_with('vault')
+
+    def test_configure_secret_backend(self):
+        hvac_client = mock.MagicMock()
+        hvac_client.list_secret_backends.return_value = ['secrets/']
+        vault.configure_secret_backend(hvac_client, 'test')
+        hvac_client.enable_secret_backend.assert_called_once_with(
+            backend_type='kv',
+            description=mock.ANY,
+            mount_point='test')
+
+    def test_configure_secret_backend_noop(self):
+        hvac_client = mock.MagicMock()
+        hvac_client.list_secret_backends.return_value = ['secrets/']
+        vault.configure_secret_backend(hvac_client, 'secrets')
+        hvac_client.enable_secret_backend.assert_not_called()
+
+    def test_configure_policy(self):
+        hvac_client = mock.MagicMock()
+        vault.configure_policy(hvac_client, 'test-policy', 'test-hcl')
+        hvac_client.set_policy.assert_called_once_with(
+            'test-policy',
+            'test-hcl',
+        )
+
+    def test_configure_approle(self):
+        hvac_client = mock.MagicMock()
+        hvac_client.get_role_id.return_value = 'some-UUID'
+        self.assertEqual(
+            vault.configure_approle(hvac_client,
+                                    'test-role',
+                                    '10.5.0.20/32',
+                                    ['test-policy']),
+            'some-UUID'
+        )
+        hvac_client.create_role.assert_called_once_with(
+            'test-role',
+            token_ttl='60s',
+            token_max_ttl='60s',
+            policies=['test-policy'],
+            bind_secret_id='false',
+            bound_cidr_list='10.5.0.20/32'
+        )
+        hvac_client.get_role_id.assert_called_with('test-role')

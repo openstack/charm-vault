@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/local/sbin/charm-env python3
 # Copyright 2018 Canonical Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,6 +26,8 @@ basic.init_config_states()
 import charmhelpers.core.hookenv as hookenv
 
 import charm.vault as vault
+
+import charms.reactive
 
 
 def authorize_charm_action(*args):
@@ -55,6 +57,8 @@ def main(args):
             action(args)
         except Exception as e:
             hookenv.action_fail(str(e))
+        else:
+            charms.reactive.main()
 
 
 if __name__ == "__main__":

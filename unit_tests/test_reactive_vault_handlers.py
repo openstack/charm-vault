@@ -135,6 +135,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
                 perms=0o644)
         ]
         self.render.assert_has_calls(render_calls)
+        self.service.assert_called_with('enable', 'vault')
 
     @patch.object(handlers, 'configure_vault')
     def test_configure_vault_psql(self, configure_vault):
@@ -467,3 +468,118 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         self.assertFalse(hacluster_mock.add_dnsha.called)
         self.assertFalse(hacluster_mock.bind_resources.called)
         self.set_flag.assert_called_once_with('config.dns_vip.invalid')
+
+    def fixture_test_requests(self):
+        test_requests = []
+        test_requests.append({
+            'secret_backend': 'charm-vaultlocker',
+            'hostname': 'juju-123456-0',
+            'isolated': True,
+            'access_address': '10.20.4.5',
+            'unit': mock.MagicMock()
+        })
+        test_requests[-1]['unit'].unit_name = 'ceph-osd/0'
+
+        test_requests.append({
+            'secret_backend': 'charm-supersecrets',
+            'hostname': 'juju-789012-0',
+            'isolated': True,
+            'access_address': '10.20.4.20',
+            'unit': mock.MagicMock()
+        })
+        test_requests[-1]['unit'].unit_name = 'omg/0'
+
+        return test_requests
+
+    @mock.patch.object(handlers, 'vault')
+    def test_configure_secrets_backend(self, _vault):
+        hvac_client = mock.MagicMock()
+        _vault.get_client.return_value = hvac_client
+        # Vault is up and running, init'ed and unsealed
+        hvac_client.is_initialized.return_value = True
+        hvac_client.is_sealed.return_value = False
+        self.service_running.return_value = True
+
+        _vault.get_local_charm_access_role_id.return_value = 'local-approle'
+
+        secrets_interface = mock.MagicMock()
+        self.endpoint_from_flag.return_value = secrets_interface
+        secrets_interface.requests.return_value = self.fixture_test_requests()
+        _vault.configure_approle.side_effect = ['role_a', 'role_b']
+        self.is_flag_set.return_value = False
+        _vault.get_api_url.return_value = "http://vault:8200"
+
+        handlers.configure_secrets_backend()
+
+        hvac_client.auth_approle.assert_called_once_with('local-approle')
+        _vault.configure_secret_backend.assert_has_calls([
+            mock.call(hvac_client, name='charm-vaultlocker'),
+            mock.call(hvac_client, name='charm-supersecrets')
+        ])
+
+        _vault.configure_policy.assert_has_calls([
+            mock.call(hvac_client, name='charm-ceph-osd-0', hcl=mock.ANY),
+            mock.call(hvac_client, name='charm-omg-0', hcl=mock.ANY)
+        ])
+
+        _vault.configure_approle.assert_has_calls([
+            mock.call(hvac_client, name='charm-ceph-osd-0',
+                      cidr="10.20.4.5/32",
+                      policies=mock.ANY),
+            mock.call(hvac_client, name='charm-omg-0',
+                      cidr="10.20.4.20/32",
+                      policies=mock.ANY)
+        ])
+
+        secrets_interface.set_role_id.assert_has_calls([
+            mock.call(unit=mock.ANY,
+                      role_id='role_a'),
+            mock.call(unit=mock.ANY,
+                      role_id='role_b'),
+        ])
+
+        self.clear_flag.assert_called_once_with('endpoint.secrets.new-request')
+
+    @mock.patch.object(handlers, 'vault')
+    def send_vault_url_and_ca(self, _vault):
+        _test_config = {
+            'vip': '10.5.100.1',
+            'ssl-ca': 'test-ca',
+        }
+        self.config.side_effect = lambda key: _test_config.get(key)
+        mock_secrets = mock.MagicMock()
+        self.endpoint_from_flag.return_value = mock_secrets
+        self.is_flag_set.return_value = False
+        _vault.get_api_url.return_value = 'http://10.5.0.23:8200'
+        handlers.send_vault_url_and_ca()
+        self.endpoint_from_flag.assert_called_with('secrets.connected')
+        self.is_flag_set.assert_called_with('ha.available')
+        _vault.get_api_url.assert_called_once_with()
+        mock_secrets.publish_url.assert_called_once_with(
+            vault_url='http://10.5.0.23:8200'
+        )
+        mock_secrets.publish_ca.assert_called_once_with(
+            vault_ca='test-ca'
+        )
+
+    @mock.patch.object(handlers, 'vault')
+    def send_vault_url_and_ca_ha(self, _vault):
+        _test_config = {
+            'vip': '10.5.100.1',
+            'ssl-ca': 'test-ca',
+        }
+        self.config.side_effect = lambda key: _test_config.get(key)
+        mock_secrets = mock.MagicMock()
+        self.endpoint_from_flag.return_value = mock_secrets
+        self.is_flag_set.return_value = True
+        _vault.get_api_url.return_value = 'http://10.5.100.1:8200'
+        handlers.send_vault_url_and_ca()
+        self.endpoint_from_flag.assert_called_with('secrets.connected')
+        self.is_flag_set.assert_called_with('ha.available')
+        _vault.get_api_url.assert_called_once_with(address='10.5.100.1')
+        mock_secrets.publish_url.assert_called_once_with(
+            vault_url='http://10.5.100.1:8200'
+        )
+        mock_secrets.publish_ca.assert_called_once_with(
+            vault_ca='test-ca'
+        )
