@@ -12,3 +12,13 @@ smoke_bundles:
   - xenial-mysql
 dev_bundles:
   - bionic
+target_deploy_status:
+  vault:
+    workload-status: blocked
+    workload-status-message: Vault needs to be initialized
+  easyrsa:
+    workload-status-message: Certificate Authority connected.
+  etcd:
+    workload-status-message: Healthy
+  postgresql:
+    workload-status-message: Live

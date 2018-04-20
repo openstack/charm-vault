@@ -58,3 +58,9 @@ options:
     description: |
       DNS record to use for DNS HA with MAAS. Do not use vip setting
       if this is set.
+  auto-unlock:
+    type: boolean
+    default: false
+    description: >-
+      FOR TESTING ONLY. Initialise vault after deployment and store the keys
+      locally.

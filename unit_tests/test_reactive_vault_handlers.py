@@ -58,7 +58,6 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             'open_port',
             'service_restart',
             'service_running',
-            'service_start',
             'set_state',
             'status_set',
             'remove_state',
@@ -86,7 +85,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             'ssl-cert': 'acert',
             'ssl-key': 'akey'}))
 
-    @patch.object(handlers, 'can_restart')
+    @patch.object(handlers.vault, 'can_restart')
     def test_configure_vault(self, can_restart):
         can_restart.return_value = True
         self.config.return_value = {'disable-mlock': False}
@@ -215,7 +214,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
 
     @patch.object(handlers, 'save_etcd_client_credentials')
     @patch.object(handlers.vault, 'get_cluster_url')
-    @patch.object(handlers, 'can_restart')
+    @patch.object(handlers.vault, 'can_restart')
     @patch.object(handlers.vault, 'get_api_url')
     def test_configure_vault_etcd(self, get_api_url, can_restart,
                                   get_cluster_url,
@@ -260,55 +259,8 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         )
         self.is_flag_set.assert_called_with('etcd.tls.available')
 
-    @patch.object(handlers.hvac, 'Client')
-    @patch.object(handlers.vault, 'get_api_url')
-    def test_get_client(self, get_api_url, hvac_Client):
-        get_api_url.return_value = 'http://this-unit'
-        handlers.get_client()
-        hvac_Client.assert_called_once_with(url='http://this-unit')
-
-    def test_can_restart_vault_down(self):
-        self.service_running.return_value = False
-        self.assertTrue(handlers.can_restart())
-
-    @patch.object(handlers, 'get_client')
-    def test_can_restart_not_initialized(self, get_client):
-        hvac_mock = mock.MagicMock()
-        hvac_mock.is_initialized.return_value = False
-        get_client.return_value = hvac_mock
-        self.assertTrue(handlers.can_restart())
-
-    @patch.object(handlers, 'get_client')
-    def test_can_restart_sealed(self, get_client):
-        hvac_mock = mock.MagicMock()
-        hvac_mock.is_initialized.return_value = True
-        hvac_mock.is_sealed.return_value = True
-        get_client.return_value = hvac_mock
-        self.assertTrue(handlers.can_restart())
-
-    @patch.object(handlers, 'get_client')
-    def test_can_restart_unsealed(self, get_client):
-        hvac_mock = mock.MagicMock()
-        hvac_mock.is_initialized.return_value = True
-        hvac_mock.is_sealed.return_value = False
-        get_client.return_value = hvac_mock
-        self.assertFalse(handlers.can_restart())
-
-    @patch.object(handlers.vault, 'get_api_url')
-    @patch.object(handlers, 'requests')
-    def test_get_vault_health(self, requests, get_api_url):
-        get_api_url.return_value = "https://vault.demo.com:8200"
-        mock_response = mock.MagicMock()
-        mock_response.json.return_value = self._health_response
-        requests.get.return_value = mock_response
-        self.assertEqual(handlers.get_vault_health(),
-                         self._health_response)
-        requests.get.assert_called_with(
-            "https://vault.demo.com:8200/v1/sys/health")
-        mock_response.json.assert_called_once()
-
     @patch.object(handlers, '_assess_interface_groups')
-    @patch.object(handlers, 'get_vault_health')
+    @patch.object(handlers.vault, 'get_vault_health')
     def test_assess_status(self, get_vault_health,
                            _assess_interface_groups):
         self.is_flag_set.return_value = False
@@ -356,7 +308,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         self.is_flag_set.assert_called_with('config.dns_vip.invalid')
 
     @patch.object(handlers, '_assess_interface_groups')
-    @patch.object(handlers, 'get_vault_health')
+    @patch.object(handlers.vault, 'get_vault_health')
     def test_assess_status_not_running(self, get_vault_health,
                                        _assess_interface_groups):
         self.is_flag_set.return_value = False
@@ -368,7 +320,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             'blocked', 'Vault service not running')
 
     @patch.object(handlers, '_assess_interface_groups')
-    @patch.object(handlers, 'get_vault_health')
+    @patch.object(handlers.vault, 'get_vault_health')
     def test_assess_status_vault_init(self, get_vault_health,
                                       _assess_interface_groups):
         self.is_flag_set.return_value = False
@@ -380,7 +332,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             'blocked', 'Vault needs to be initialized')
 
     @patch.object(handlers, '_assess_interface_groups')
-    @patch.object(handlers, 'get_vault_health')
+    @patch.object(handlers.vault, 'get_vault_health')
     def test_assess_status_vault_sealed(self, get_vault_health,
                                         _assess_interface_groups):
         self.is_flag_set.return_value = False
@@ -438,17 +390,23 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         self.config.assert_called_with('channel')
         self.set_flag.assert_called_with('snap.channel.invalid')
 
-    @patch.object(handlers, 'can_restart')
+    @patch.object(handlers.vault, 'can_restart')
     def test_snap_refresh_restartable(self, can_restart):
-        self.config.return_value = 'edge'
+        conf = {
+            'channel': 'edge',
+            'auto-unlock': False}
+        self.config.side_effect = lambda x: conf[x]
         can_restart.return_value = True
         handlers.snap_refresh()
         self.snap.refresh.assert_called_with('vault', channel='edge')
-        self.config.assert_called_with('channel')
         self.service_restart.assert_called_with('vault')
         self.clear_flag.assert_called_with('snap.channel.invalid')
+        config_calls = [
+            mock.call('channel'),
+            mock.call('auto-unlock')]
+        self.config.assert_has_calls(config_calls)
 
-    @patch.object(handlers, 'can_restart')
+    @patch.object(handlers.vault, 'can_restart')
     def test_snap_refresh_not_restartable(self, can_restart):
         self.config.return_value = 'edge'
         can_restart.return_value = False

@@ -1,9 +1,6 @@
 import base64
-import hvac
 import psycopg2
-import requests
 import subprocess
-import tenacity
 
 
 from charmhelpers.contrib.charmsupport.nrpe import (
@@ -28,9 +25,9 @@ from charmhelpers.core.hookenv import (
 )
 
 from charmhelpers.core.host import (
+    service,
     service_restart,
     service_running,
-    service_start,
     write_file,
 )
 
@@ -44,6 +41,7 @@ from charms.reactive import (
     remove_state,
     set_state,
     when,
+    when_file_changed,
     when_not,
 )
 
@@ -76,7 +74,6 @@ VAULT_INDEX_DDL = """
 CREATE INDEX IF NOT EXISTS parent_path_idx ON vault_kv_store (parent_path);
 """
 
-VAULT_HEALTH_URL = '{vault_addr}/v1/sys/health'
 
 OPTIONAL_INTERFACES = [
     ['etcd'],
@@ -85,32 +82,8 @@ REQUIRED_INTERFACES = [
     ['shared-db', 'db.master']
 ]
 
-
-def get_client():
-    return hvac.Client(url=vault.get_api_url())
-
-
-@tenacity.retry(wait=tenacity.wait_exponential(multiplier=1, max=10),
-                stop=tenacity.stop_after_attempt(10),
-                reraise=True)
-def get_vault_health():
-    response = requests.get(
-        VAULT_HEALTH_URL.format(vault_addr=vault.get_api_url()))
-    return response.json()
-
-
-def can_restart():
-    safe_restart = False
-    if not service_running('vault'):
-        safe_restart = True
-    else:
-        client = get_client()
-        if not client.is_initialized():
-            safe_restart = True
-        elif client.is_sealed():
-            safe_restart = True
-    log("Safe to restart: {}".format(safe_restart), level=DEBUG)
-    return safe_restart
+VAULT_CONFIG = '/var/snap/vault/common/vault.hcl'
+VAULT_SYSTEMD_CONFIG = '/etc/systemd/system/vault.service'
 
 
 def ssl_available(config):
@@ -158,9 +131,11 @@ def snap_refresh():
     if validate_snap_channel(channel):
         clear_flag('snap.channel.invalid')
         snap.refresh('vault', channel=channel)
-        if can_restart():
+        if vault.can_restart():
             log("Restarting vault", level=DEBUG)
             service_restart('vault')
+            if config('auto-unlock'):
+                vault.prepare_vault()
     else:
         set_flag('snap.channel.invalid')
 
@@ -192,20 +167,16 @@ def configure_vault(context):
     log("Rendering vault.hcl.j2", level=DEBUG)
     render(
         'vault.hcl.j2',
-        '/var/snap/vault/common/vault.hcl',
+        VAULT_CONFIG,
         context,
         perms=0o600)
     log("Rendering vault systemd configuation", level=DEBUG)
     render(
         'vault.service.j2',
-        '/etc/systemd/system/vault.service',
+        VAULT_SYSTEMD_CONFIG,
         {},
         perms=0o644)
-    if can_restart():
-        log("Restarting vault", level=DEBUG)
-        service_restart('vault')
-    else:
-        service_start('vault')      # restart seals the vault
+    service('enable', 'vault')
     log("Opening vault port", level=DEBUG)
     open_port(8200)
 
@@ -409,6 +380,14 @@ def cluster_connected(hacluster):
     hacluster.bind_resources()
 
 
+@when_file_changed(VAULT_CONFIG, VAULT_SYSTEMD_CONFIG)
+def file_change_auto_unlock_mode():
+    log("Calling opportunistic_restart", level=DEBUG)
+    vault.opportunistic_restart()
+    if config('auto-unlock'):
+        vault.prepare_vault()
+
+
 @when('snap.installed.vault')
 def prime_assess_status():
     atexit(_assess_status)
@@ -511,7 +490,7 @@ def _assess_status():
 
     health = None
     if service_running('vault'):
-        health = get_vault_health()
+        health = vault.get_vault_health()
         application_version_set(health.get('version'))
 
     _missing_interfaces = []
