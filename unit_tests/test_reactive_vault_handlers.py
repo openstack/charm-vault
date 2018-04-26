@@ -58,6 +58,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             'open_port',
             'service_restart',
             'service_running',
+            'service',
             'set_state',
             'status_set',
             'remove_state',

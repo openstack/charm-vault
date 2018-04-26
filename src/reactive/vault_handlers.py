@@ -141,8 +141,6 @@ def snap_refresh():
 
 
 def configure_vault(context):
-    context['disable_mlock'] = config()['disable-mlock']
-    context['ssl_available'] = is_state('vault.ssl.available')
     log("Running configure_vault", level=DEBUG)
     context['disable_mlock'] = config()['disable-mlock']
     context['ssl_available'] = is_state('vault.ssl.available')
@@ -179,10 +177,10 @@ def configure_vault(context):
     service('enable', 'vault')
     log("Opening vault port", level=DEBUG)
     open_port(8200)
+    set_flag('configured')
 
 
 @when('snap.installed.vault')
-@when_not('configured')
 @when('db.master.available')
 @when('vault.schema.created')
 @when('vault.ssl.configured')
@@ -195,7 +193,6 @@ def configure_vault_psql(psql):
 
 
 @when('snap.installed.vault')
-@when_not('configured')
 @when('shared-db.available')
 @when('vault.ssl.configured')
 def configure_vault_mysql(mysql):
@@ -305,24 +302,6 @@ def ssl_key_changed():
 @when('config.changed.ssl-ca')
 def ssl_ca_changed():
     remove_state('vault.ssl.configured')
-
-
-@when_not('etcd.local.configured')
-@when('etcd.available')
-def etcd_setup(etcd):
-    log("Detected etcd.available, removing configured", level=DEBUG)
-    remove_state('configured')
-    remove_state('etcd.local.unconfigured')
-    set_state('etcd.local.configured')
-
-
-@when_not('etcd.local.unconfigured')
-@when_not('etcd.available')
-def etcd_not_ready():
-    log("Detected etcd_not_ready, removing configured", level=DEBUG)
-    set_state('etcd.local.unconfigured')
-    remove_state('etcd.local.configured')
-    remove_state('configured')
 
 
 @when('configured')
