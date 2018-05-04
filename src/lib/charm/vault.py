@@ -299,6 +299,22 @@ def configure_approle(client, name, cidr, policies):
         token_ttl='60s',
         token_max_ttl='60s',
         policies=policies,
-        bind_secret_id='false',
+        bind_secret_id='true',
         bound_cidr_list=cidr)
     return client.get_role_id(name)
+
+
+def generate_role_secret_id(client, name, cidr):
+    """Generate a new secret_id for an AppRole
+
+    :param client: Vault client
+    :ptype client: hvac.Client
+    :param name: Name of role
+    :ptype name: str
+    :param cidr: Network address of remote unit
+    :ptype cidr: str
+    :returns: Vault token to retrieve the response-wrapped response
+    :rtype: str"""
+    response = client.write('auth/approle/role/{}/secret-id'.format(name),
+                            wrap_ttl='1h', cidr_list=cidr)
+    return response['wrap_info']['token']

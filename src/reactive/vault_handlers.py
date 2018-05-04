@@ -44,6 +44,7 @@ from charms.reactive import (
     when,
     when_file_changed,
     when_not,
+    when_any,
 )
 
 from charms.reactive.relations import (
@@ -370,7 +371,7 @@ def file_change_auto_unlock_mode():
 
 
 @when('leadership.is_leader')
-@when('endpoint.secrets.new-request')
+@when_any('endpoint.secrets.new-request', 'secrets.refresh')
 def configure_secrets_backend():
     """ Process requests for setup and access to simple kv secret backends """
     @tenacity.retry(wait=tenacity.wait_exponential(multiplier=1, max=10),
@@ -400,7 +401,8 @@ def configure_secrets_backend():
         return
     client.auth_approle(charm_role_id)
 
-    secrets = endpoint_from_flag('endpoint.secrets.new-request')
+    secrets = (endpoint_from_flag('endpoint.secrets.new-request') or
+               endpoint_from_flag('secrets.connected'))
     requests = secrets.requests()
 
     # Configure KV secret backends
@@ -410,6 +412,8 @@ def configure_secrets_backend():
         if not backend.startswith('charm-'):
             continue
         vault.configure_secret_backend(client, name=backend)
+
+    refresh_secrets = is_flag_set('secrets.refresh')
 
     # Configure AppRoles for application unit access
     for request in requests:
@@ -437,16 +441,27 @@ def configure_secrets_backend():
                                        hostname=hostname)
         )
 
+        cidr = '{}/32'.format(access_address)
+        new_role = (approle_name not in client.list_roles())
+
         approle_id = vault.configure_approle(
             client,
             name=approle_name,
-            cidr='{}/32'.format(access_address),
+            cidr=cidr,
             policies=[policy_name])
 
-        secrets.set_role_id(unit=unit,
-                            role_id=approle_id)
+        if new_role or refresh_secrets:
+            wrapped_secret = vault.generate_role_secret_id(
+                client,
+                name=approle_name,
+                cidr=cidr
+            )
+            secrets.set_role_id(unit=unit,
+                                role_id=approle_id,
+                                token=wrapped_secret)
 
     clear_flag('endpoint.secrets.new-request')
+    clear_flag('secrets.refresh')
 
 
 @when('secrets.connected')
