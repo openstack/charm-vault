@@ -136,7 +136,7 @@ def snap_refresh():
         if vault.can_restart():
             log("Restarting vault", level=DEBUG)
             service_restart('vault')
-            if config('auto-unlock'):
+            if config('totally-unsecure-auto-unlock'):
                 vault.prepare_vault()
     else:
         set_flag('snap.channel.invalid')
@@ -365,7 +365,7 @@ def cluster_connected(hacluster):
 def file_change_auto_unlock_mode():
     log("Calling opportunistic_restart", level=DEBUG)
     vault.opportunistic_restart()
-    if config('auto-unlock'):
+    if config('totally-unsecure-auto-unlock'):
         vault.prepare_vault()
 
 

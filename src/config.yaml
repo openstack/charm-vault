@@ -58,7 +58,7 @@ options:
     description: |
       DNS record to use for DNS HA with MAAS. Do not use vip setting
       if this is set.
-  auto-unlock:
+  totally-unsecure-auto-unlock:
     type: boolean
     default: false
     description: >-

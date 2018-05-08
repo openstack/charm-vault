@@ -396,7 +396,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
     def test_snap_refresh_restartable(self, can_restart):
         conf = {
             'channel': 'edge',
-            'auto-unlock': False}
+            'totally-unsecure-auto-unlock': False}
         self.config.side_effect = lambda x: conf[x]
         can_restart.return_value = True
         handlers.snap_refresh()
@@ -405,7 +405,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         self.clear_flag.assert_called_with('snap.channel.invalid')
         config_calls = [
             mock.call('channel'),
-            mock.call('auto-unlock')]
+            mock.call('totally-unsecure-auto-unlock')]
         self.config.assert_has_calls(config_calls)
 
     @patch.object(handlers.vault, 'can_restart')

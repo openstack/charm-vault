@@ -242,7 +242,7 @@ def can_restart():
     safe_restart = False
     if not host.service_running('vault'):
         safe_restart = True
-    elif hookenv.config('auto-unlock'):
+    elif hookenv.config('totally-unsecure-auto-unlock'):
         safe_restart = True
     else:
         client = get_client(url=VAULT_LOCALHOST_URL)
