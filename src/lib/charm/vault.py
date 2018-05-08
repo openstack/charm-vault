@@ -136,7 +136,7 @@ def setup_charm_vault_access(token=None):
     :returns: Id of created role
     :rtype: str"""
     if not token:
-        token = hookenv.leader_get('token')
+        token = hookenv.leader_get('root_token')
     client = hvac.Client(
         url=VAULT_LOCALHOST_URL,
         token=token)
@@ -203,7 +203,8 @@ def prepare_vault():
     if vault_health['sealed']:
         unseal_vault()
     if hookenv.is_leader():
-        setup_charm_vault_access()
+        role_id = setup_charm_vault_access()
+        hookenv.leader_set({CHARM_ACCESS_ROLE_ID: role_id})
 
 
 def initialize_vault(shares=1, threshold=1):
