@@ -1,4 +1,4 @@
 netifaces
-hvac
+hvac<0.7.0
 tenacity
 pbr

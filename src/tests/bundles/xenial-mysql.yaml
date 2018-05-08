@@ -13,6 +13,20 @@ services:
     options:
       admin-password: openstack
       openstack-origin: cloud:xenial-queens
+  ceph-mon:
+    charm: cs:ceph-mon
+    num_units: 3
+    options:
+      source: cloud:xenial-queens
+  ceph-osd:
+    charm: cs:~openstack-charmers-next/ceph-osd
+    num_units: 3
+    options:
+      source: cloud:xenial-queens
+      osd-encrypt: true
+      osd-encrypt-keymanager: vault
+    storage:
+      osd-devices: 10G,2
 relations:
 - - vault:shared-db
   - mysql:shared-db
@@ -20,3 +34,7 @@ relations:
   - mysql:shared-db
 - - vault:certificates
   - keystone:certificates
+- - vault:secrets
+  - ceph-osd:secrets-storage
+- - ceph-mon:osd
+  - ceph-osd:mon

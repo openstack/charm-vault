@@ -328,7 +328,7 @@ def configure_secret_backend(client, name):
         client.enable_secret_backend(backend_type='kv',
                                      description='Charm created KV backend',
                                      mount_point=name,
-                                     options={'version': 2})
+                                     options={'version': 1})
 
 
 def configure_policy(client, name, hcl):
