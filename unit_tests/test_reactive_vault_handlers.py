@@ -69,8 +69,10 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             'is_flag_set',
             'set_flag',
             'clear_flag',
+            'is_container',
         ]
         self.patch_all()
+        self.is_container.return_value = False
 
     def test_ssl_available(self):
         self.assertFalse(handlers.ssl_available({
@@ -89,7 +91,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
     @patch.object(handlers.vault, 'can_restart')
     def test_configure_vault(self, can_restart):
         can_restart.return_value = True
-        self.config.return_value = {'disable-mlock': False}
+        self.config.return_value = False
         self.is_state.return_value = True
         db_context = {
             'storage_name': 'psql',
@@ -117,9 +119,10 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         ]
         self.open_port.assert_called_once_with(8200)
         self.render.assert_has_calls(render_calls)
+        self.config.assert_called_with('disable-mlock')
 
         # Check flipping disable-mlock makes it to the context
-        self.config.return_value = {'disable-mlock': True}
+        self.config.return_value = True
         expected_context['disable_mlock'] = True
         handlers.configure_vault(db_context)
         render_calls = [
@@ -136,6 +139,29 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         ]
         self.render.assert_has_calls(render_calls)
         self.service.assert_called_with('enable', 'vault')
+        self.config.assert_called_with('disable-mlock')
+
+        # Ensure is_container will override config option
+        self.config.return_value = False
+        self.is_container.return_value = True
+        expected_context['disable_mlock'] = True
+        handlers.configure_vault(db_context)
+        render_calls = [
+            mock.call(
+                'vault.hcl.j2',
+                '/var/snap/vault/common/vault.hcl',
+                expected_context,
+                perms=0o600),
+            mock.call(
+                'vault.service.j2',
+                '/etc/systemd/system/vault.service',
+                {},
+                perms=0o644)
+        ]
+        self.render.assert_has_calls(render_calls)
+        self.service.assert_called_with('enable', 'vault')
+        self.config.assert_called_with('disable-mlock')
+        self.is_container.assert_called_with()
 
     @patch.object(handlers, 'configure_vault')
     def test_configure_vault_psql(self, configure_vault):
@@ -224,7 +250,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         can_restart.return_value = True
         get_api_url.return_value = 'http://this-unit:8200'
         get_cluster_url.return_value = 'http://this-unit:8201'
-        self.config.return_value = {'disable-mlock': False}
+        self.config.return_value = False
         etcd_mock = mock.MagicMock()
         etcd_mock.connection_string.return_value = 'http://etcd'
         self.is_flag_set.return_value = True
@@ -260,6 +286,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             ca=expected_context['etcd_tls_ca_file'],
         )
         self.is_flag_set.assert_called_with('etcd.tls.available')
+        self.config.assert_called_with('disable-mlock')
 
     @patch.object(handlers, '_assess_interface_groups')
     @patch.object(handlers.vault, 'get_vault_health')
@@ -274,7 +301,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         self.application_version_set.assert_called_with(
             self._health_response['version'])
         self.status_set.assert_called_with(
-            'active', 'Unit is ready (active: true)')
+            'active', 'Unit is ready (active: true, mlock: enabled)')
         self.config.assert_called_with('disable-mlock')
         _assess_interface_groups.assert_has_calls([
             mock.call(handlers.REQUIRED_INTERFACES,

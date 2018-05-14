@@ -30,6 +30,7 @@ from charmhelpers.core.host import (
     service_restart,
     service_running,
     write_file,
+    is_container,
 )
 
 from charmhelpers.core.templating import (
@@ -144,7 +145,7 @@ def snap_refresh():
 
 def configure_vault(context):
     log("Running configure_vault", level=DEBUG)
-    context['disable_mlock'] = config()['disable-mlock']
+    context['disable_mlock'] = is_container() or config('disable-mlock')
     context['ssl_available'] = is_state('vault.ssl.available')
 
     if is_flag_set('etcd.tls.available'):
@@ -596,14 +597,13 @@ def _assess_status():
         status_set('blocked', 'Unit is sealed')
         return
 
-    if config('disable-mlock'):
-        status_set(
-            'active',
-            'WARNING: DISABLE-MLOCK IS SET -- SECRETS MAY BE LEAKED'
+    mlock_disabled = is_container() or config('disable-mlock')
+
+    status_set(
+        'active',
+        'Unit is ready '
+        '(active: {}, mlock: {})'.format(
+            str(not health['standby']).lower(),
+            'disabled' if mlock_disabled else 'enabled'
         )
-    else:
-        status_set(
-            'active',
-            'Unit is ready '
-            '(active: {})'.format(str(not health['standby']).lower())
-        )
+    )
