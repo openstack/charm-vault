@@ -8,3 +8,60 @@ authorize-charm:
   - token
 refresh-secrets:
   description: Refresh secret_id's and re-issue retrieval tokens for secrets endpoints
+get-csr:
+  description: Get intermediate CA csr
+  properties:
+    # Depending on the configuration of CA that will sign the CSRs it
+    # may be necessary to ensure these fields match the CA
+    country:
+      type: string
+      description: >-
+        The C (Country) values in the subject field of the CSR
+    province:
+      type: string
+      description: >-
+        The ST (Province) values in the subject field of the CSR.
+    organization:
+      type: string
+      description: >-
+        The O (Organization) values in the subject field of the CSR.
+    organizational-unit:
+      type: string
+      description: >-
+        The OU (OrganizationalUnit) values in the subject field of the CSR.
+upload-signed-csr:
+  description: Upload a signed csr to vault
+  properties:
+    pem:
+      type: string
+      description: base64 encoded certificate
+    allow-subdomains:
+      type: boolean
+      default: True
+      description: >-
+        Specifies if clients can request certificates with
+    enforce-hostnames:
+      type: boolean
+      default: False
+      description: >-
+        Specifies if only valid host names are allowed
+        for CNs, DNS SANs, and the host part of email addresses.
+    allow-any-name:
+      type: boolean
+      default: True
+      description: >-
+        Specifies if clients can request any CN
+    max-ttl:
+      type: string
+      default: '87598h'
+      description: >-
+        Specifies the maximum Time To Live
+    root-ca:
+      type: string
+      description: >-
+        The certificate of the root CA which will be passed out to client on
+        the certificate relation along with the intermediate CA cert
+  required:
+  - pem
+reissue-certificates:
+  description: Reissue certificates to all clients

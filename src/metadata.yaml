@@ -34,6 +34,8 @@ provides:
     scope: container
   secrets:
     interface: vault-kv
+  certificates:
+    interface: tls-certificates
 peers:
   cluster:
     interface: vault-ha

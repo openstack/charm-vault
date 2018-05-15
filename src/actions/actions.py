@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
 import os
 import sys
 
@@ -26,7 +27,7 @@ basic.init_config_states()
 import charmhelpers.core.hookenv as hookenv
 
 import charm.vault as vault
-
+import charm.vault_pki as vault_pki
 import charms.reactive
 
 from charms.reactive.flags import set_flag
@@ -50,11 +51,49 @@ def refresh_secrets(*args):
     set_flag('secrets.refresh')
 
 
+def get_intermediate_csrs(*args):
+    if not hookenv.is_leader():
+        hookenv.action_fail('Please run action on lead unit')
+    action_config = hookenv.action_get() or {}
+    csrs = vault_pki.get_csr(
+        ttl=action_config.get('ttl'),
+        country=action_config.get('country'),
+        province=action_config.get('province'),
+        organization=action_config.get('organization'),
+        organizational_unit=action_config.get('organizational-unit'))
+    hookenv.action_set({'output': csrs})
+
+
+def upload_signed_csr(*args):
+    if not hookenv.is_leader():
+        hookenv.action_fail('Please run action on lead unit')
+        return
+
+    action_config = hookenv.action_get()
+    root_ca = action_config.get('root-ca')
+    if root_ca:
+        hookenv.leader_set(
+            {'root-ca': base64.b64decode(root_ca).decode("utf-8")})
+    vault_pki.upload_signed_csr(
+        base64.b64decode(action_config['pem']).decode("utf-8"),
+        allowed_domains=action_config.get('allowed-domains'),
+        allow_subdomains=action_config.get('allow-subdomains'),
+        enforce_hostnames=action_config.get('enforce-hostnames'),
+        allow_any_name=action_config.get('allow-any-name'),
+        max_ttl=action_config.get('max-ttl'))
+
+
+def reissue_certificates(*args):
+    charms.reactive.set_flag('certificates.reissue.requested')
+
 # Actions to function mapping, to allow for illegal python action names that
 # can map to a python function.
 ACTIONS = {
     "authorize-charm": authorize_charm_action,
     "refresh-secrets": refresh_secrets,
+    "get-csr": get_intermediate_csrs,
+    "upload-signed-csr": upload_signed_csr,
+    "reissue-certificates": reissue_certificates,
 }
 
 

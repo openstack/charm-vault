@@ -61,6 +61,7 @@ from charms.reactive.flags import (
 from charms.layer import snap
 
 import lib.charm.vault as vault
+import lib.charm.vault_pki as vault_pki
 
 # See https://www.vaultproject.io/docs/configuration/storage/postgresql.html
 
@@ -622,3 +623,69 @@ def _assess_status():
             'disabled' if mlock_disabled else 'enabled'
         )
     )
+
+
+@when('leadership.is_leader')
+@when_any('certificates.server.cert.requested',
+          'certificates.reissue.requested')
+def create_server_cert():
+    if not vault.vault_ready_for_clients():
+        log('Unable to process new secret backend requests,'
+            ' deferring until vault is fully configured', level=DEBUG)
+        return
+    reissue_requested = is_flag_set('certificates.reissue.requested')
+    tls = endpoint_from_flag('certificates.available')
+    server_requests = tls.get_server_requests()
+    for unit_name, request in server_requests.items():
+        log(
+            'Processing certificate requests from {}'.format(unit_name),
+            level=DEBUG)
+        # Process request for a single certificate
+        cn = request.get('common_name')
+        sans = request.get('sans')
+        if cn and sans:
+            log(
+                'Processing single certificate requests for {}'.format(cn),
+                level=DEBUG)
+            try:
+                bundle = vault_pki.process_cert_request(
+                    cn,
+                    sans,
+                    unit_name,
+                    reissue_requested)
+            except vault.VaultNotReady:
+                # Cannot continue if vault is not ready
+                return
+            # Set the certificate and key for the unit on the relationship.
+            tls.set_server_cert(
+                unit_name,
+                bundle['certificate'],
+                bundle['private_key'])
+        # Process request for a batch of certificates
+        cert_requests = request.get('cert_requests')
+        if cert_requests:
+            log(
+                'Processing batch of requests from {}'.format(unit_name),
+                level=DEBUG)
+            for cn, crequest in cert_requests.items():
+                log('Processing requests for {}'.format(cn), level=DEBUG)
+                try:
+                    bundle = vault_pki.process_cert_request(
+                        cn,
+                        crequest.get('sans'),
+                        unit_name,
+                        reissue_requested)
+                except vault.VaultNotReady:
+                    # Cannot continue if vault is not ready
+                    return
+                tls.add_server_cert(
+                    unit_name,
+                    cn,
+                    bundle['certificate'],
+                    bundle['private_key'])
+            tls.set_server_multicerts(unit_name)
+        tls.set_ca(vault_pki.get_ca())
+        chain = vault_pki.get_chain()
+        if chain:
+            tls.set_chain(chain)
+    clear_flag('certificates.reissue.requested')

@@ -8,6 +8,7 @@ includes:
  - interface:etcd
  - interface:hacluster
  - interface:vault-kv
+ - interface:tls-certificates
 options:
   basic:
     packages:

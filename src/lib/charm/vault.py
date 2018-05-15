@@ -55,6 +55,11 @@ path "sys/mounts/charm-*" {
   capabilities = ["create", "read", "update", "delete", "sudo"]
 }
 
+# Allow charm- prefixes pki backends to be used
+path "charm-pki-*" {
+  capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+}
+
 # Allow discovery of secrets backends
 path "sys/mounts" {
   capabilities = ["read"]
@@ -62,9 +67,6 @@ path "sys/mounts" {
 path "sys/mounts/" {
   capabilities = ["list"]
 }"""
-
-VAULT_HEALTH_URL = '{vault_addr}/v1/sys/health'
-VAULT_LOCALHOST_URL = "http://127.0.0.1:8220"
 
 SECRET_BACKEND_HCL = """
 path "{backend}/{hostname}/*" {{
@@ -77,6 +79,17 @@ path "{backend}/*" {{
   capabilities = ["create", "read", "update", "delete", "list"]
 }}
 """
+VAULT_LOCALHOST_URL = "http://127.0.0.1:8220"
+VAULT_HEALTH_URL = '{vault_addr}/v1/sys/health'
+
+
+class VaultNotReady(Exception):
+    """Exception raised for units in error state
+    """
+
+    def __init__(self, reason):
+        message = "Vault is not ready ({})".format(reason)
+        super(VaultNotReady, self).__init__(message)
 
 
 def binding_address(binding):
@@ -98,6 +111,16 @@ get_api_url = functools.partial(get_vault_url,
                                 binding='access', port=8200)
 get_cluster_url = functools.partial(get_vault_url,
                                     binding='cluster', port=8201)
+
+
+def get_access_address():
+    protocol = 'http'
+    addr = hookenv.config('dns-ha-access-record')
+    addr = addr or hookenv.config('vip')
+    addr = addr or binding_address('access')
+    if charms.reactive.is_state('vault.ssl.available'):
+        protocol = 'https'
+    return '{}://{}:{}'.format(protocol, addr, 8200)
 
 
 def enable_approle_auth(client):
@@ -162,6 +185,22 @@ def get_client(url=None):
     :rtype: hvac.Client
     """
     return hvac.Client(url=url or get_api_url())
+
+
+def get_local_client():
+    """Provide a client for talking to the vault api
+
+    :returns: vault client
+    :rtype: hvac.Client
+    """
+    client = get_client(url=VAULT_LOCALHOST_URL)
+    app_role_id = get_local_charm_access_role_id()
+    if not app_role_id:
+        hookenv.log('Could not retrieve app_role_id', level=hookenv.DEBUG)
+        raise VaultNotReady("Cannot initialise local client")
+    client = hvac.Client(url=VAULT_LOCALHOST_URL)
+    client.auth_approle(app_role_id)
+    return client
 
 
 @tenacity.retry(wait=tenacity.wait_exponential(multiplier=1, max=10),
@@ -319,3 +358,35 @@ def generate_role_secret_id(client, name, cidr):
     response = client.write('auth/approle/role/{}/secret-id'.format(name),
                             wrap_ttl='1h', cidr_list=cidr)
     return response['wrap_info']['token']
+
+
+def is_backend_mounted(client, name):
+    """Check if the supplied backend is mounted
+
+    :returns: Whether mount point is in use
+    :rtype: bool
+    """
+    return '{}/'.format(name) in client.list_secret_backends()
+
+
+def vault_ready_for_clients():
+    """Check if vault is ready to recieve client requests"""
+    @tenacity.retry(wait=tenacity.wait_exponential(multiplier=1, max=10),
+                    stop=tenacity.stop_after_attempt(10),
+                    reraise=True)
+    def _check_vault_status(client):
+        if (not host.service_running('vault') or
+                not client.is_initialized() or
+                client.is_sealed()):
+            return False
+        return True
+
+    # NOTE: use localhost listener as policy only allows 127.0.0.1 to
+    #       administer the local vault instances via the charm
+    client = get_client(url=VAULT_LOCALHOST_URL)
+
+    status_ok = _check_vault_status(client)
+    if status_ok:
+        return True
+    else:
+        return False

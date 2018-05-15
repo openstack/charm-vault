@@ -1,4 +1,5 @@
 # Unit test requirements
+netifaces
 hvac
 flake8>=2.2.4,<=2.4.1
 os-testr>=0.4.1
@@ -9,3 +10,4 @@ psycopg2
 git+https://github.com/openstack/charms.openstack#egg=charms.openstack
 tenacity
 pbr
+cryptography
