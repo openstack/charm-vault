@@ -6,3 +6,5 @@ authorize-charm:
       description: Token to use to authorize charm
   required:
   - token
+refresh-secrets:
+  description: Refresh secret_id's and re-issue retrieval tokens for secrets endpoints

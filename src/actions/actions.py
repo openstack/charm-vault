@@ -29,6 +29,8 @@ import charm.vault as vault
 
 import charms.reactive
 
+from charms.reactive.flags import set_flag
+
 
 def authorize_charm_action(*args):
     """Create a role allowing the charm to perform certain vault actions.
@@ -39,10 +41,20 @@ def authorize_charm_action(*args):
     role_id = vault.setup_charm_vault_access(action_config['token'])
     hookenv.leader_set({vault.CHARM_ACCESS_ROLE_ID: role_id})
 
+
+def refresh_secrets(*args):
+    """Refresh secret_id's and re-issue tokens for secret_id retrieval
+    on secrets end-points"""
+    if not hookenv.is_leader():
+        hookenv.action_fail('Please run action on lead unit')
+    set_flag('secrets.refresh')
+
+
 # Actions to function mapping, to allow for illegal python action names that
 # can map to a python function.
 ACTIONS = {
     "authorize-charm": authorize_charm_action,
+    "refresh-secrets": refresh_secrets,
 }
 
 

@@ -342,6 +342,20 @@ class TestLibCharmVault(unit_tests.test_utils.CharmTestCase):
         vault.configure_secret_backend(hvac_client, 'secrets')
         hvac_client.enable_secret_backend.assert_not_called()
 
+    def test_generate_role_secret_id(self):
+        hvac_client = mock.MagicMock()
+        hvac_client.write.return_value = {'wrap_info': {'token': 'foo'}}
+        self.assertEqual(
+            vault.generate_role_secret_id(hvac_client,
+                                          'testrole',
+                                          '10.5.10.10/32'),
+            'foo'
+        )
+        hvac_client.write.assert_called_with(
+            'auth/approle/role/testrole/secret-id',
+            wrap_ttl='1h', cidr_list='10.5.10.10/32'
+        )
+
     def test_configure_policy(self):
         hvac_client = mock.MagicMock()
         vault.configure_policy(hvac_client, 'test-policy', 'test-hcl')
@@ -365,7 +379,7 @@ class TestLibCharmVault(unit_tests.test_utils.CharmTestCase):
             token_ttl='60s',
             token_max_ttl='60s',
             policies=['test-policy'],
-            bind_secret_id='false',
+            bind_secret_id='true',
             bound_cidr_list='10.5.0.20/32'
         )
         hvac_client.get_role_id.assert_called_with('test-role')

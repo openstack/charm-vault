@@ -535,6 +535,8 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         _vault.configure_approle.side_effect = ['role_a', 'role_b']
         self.is_flag_set.return_value = False
         _vault.get_api_url.return_value = "http://vault:8200"
+        hvac_client.list_roles.return_value = []
+        _vault.generate_role_secret_id.return_value = 'mysecret'
 
         handlers.configure_secrets_backend()
 
@@ -560,12 +562,17 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
 
         secrets_interface.set_role_id.assert_has_calls([
             mock.call(unit=mock.ANY,
-                      role_id='role_a'),
+                      role_id='role_a',
+                      token='mysecret'),
             mock.call(unit=mock.ANY,
-                      role_id='role_b'),
+                      role_id='role_b',
+                      token='mysecret'),
         ])
 
-        self.clear_flag.assert_called_once_with('endpoint.secrets.new-request')
+        self.clear_flag.assert_has_calls([
+            mock.call('endpoint.secrets.new-request'),
+            mock.call('secrets.refresh'),
+        ])
 
     @mock.patch.object(handlers, 'vault')
     def send_vault_url_and_ca(self, _vault):
