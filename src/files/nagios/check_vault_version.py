@@ -37,7 +37,7 @@ def get_vault_snap_version():
         version = info['result']['version']
         if version.startswith('v'):
             version = version[1:]
-            return version
+        return version
 
 
 def get_vault_server_version(verify=True):
