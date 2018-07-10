@@ -315,6 +315,25 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
                       incomplete_interfaces=mock.ANY),
         ])
 
+    @patch.object(handlers.vault, 'get_vault_health')
+    def test_assess_status_service_not_running(self, get_vault_health):
+        self.is_flag_set.return_value = False
+        self.service_running.return_value = False
+        handlers._assess_status()
+        self.status_set.assert_called_with(
+            'blocked', 'Vault service not running')
+
+    @patch.object(handlers.vault, 'get_vault_health')
+    def test_assess_status_empty_health(self, get_vault_health):
+        self.is_flag_set.return_value = False
+        self.service_running.return_value = True
+        get_vault_health.return_value = {}
+        handlers._assess_status()
+        self.application_version_set.assert_called_with(
+            'Unknown')
+        self.status_set.assert_called_with(
+            'blocked', 'Vault health check failed')
+
     def test_assess_status_invalid_channel(self):
         statuses = {
             'snap.channel.invalid': True,
