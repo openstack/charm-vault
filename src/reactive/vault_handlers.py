@@ -582,7 +582,16 @@ def _assess_status():
     health = None
     if service_running('vault'):
         health = vault.get_vault_health()
+    else:
+        status_set('blocked', 'Vault service not running')
+        return
+
+    if health.get('version'):
         application_version_set(health.get('version'))
+    else:
+        application_version_set('Unknown')
+        status_set('blocked', 'Vault health check failed')
+        return
 
     _missing_interfaces = []
     _incomplete_interfaces = []
