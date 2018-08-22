@@ -26,8 +26,11 @@ ha_storage "etcd" {
   tls_ca_file = "{{ etcd_tls_ca_file }}"
   tls_cert_file = "{{ etcd_tls_cert_file }}"
   tls_key_file = "{{ etcd_tls_key_file }}"
-  etcd_api = "v3"
+  # Use v2 api due to https://github.com/hashicorp/vault/issues/4961
+  etcd_api = "v2"
 }
+
+
 {%- endif %}
 listener "tcp" {
   address = "0.0.0.0:8200"
