@@ -64,3 +64,13 @@ options:
     description: >-
       FOR TESTING ONLY. Initialise vault after deployment and store the keys
       locally.
+  auto-generate-root-ca-cert:
+    type: boolean
+    default: false
+    description: >-
+      Once unsealed, automatically generate a self-signed root CA rather
+      than waiting for an action to be called to either generate one or
+      process a signing request to act as an intermediary CA.  Note that
+      this will use all default values for the root CA cert.  If you want
+      to adjust those values, you should use the generate-root-ca action
+      instead.

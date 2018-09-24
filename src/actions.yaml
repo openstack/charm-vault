@@ -65,3 +65,60 @@ upload-signed-csr:
   - pem
 reissue-certificates:
   description: Reissue certificates to all clients
+generate-root-ca:
+  description: Generate a self-signed root CA
+  properties:
+    ttl:
+      type: string
+      default: '87598h'
+      description: >-
+        Specifies the Time To Live for the root CA certificate
+    allow-any-name:
+      type: boolean
+      default: True
+      description: >-
+        Specifies if clients can request certificates for any CN.
+    allowed-domains:
+      type: array
+      items:
+        type: string
+      default: []
+      description: >-
+        Restricted list of CNs for which the root CA may issue certificates.
+        If domains are provided, allow-any-name should be set to false.
+    allow-bare-domains:
+      type: boolean
+      default: False
+      description: >-
+        Specifies whether clients can request certificates exactly matching
+        the CNs in allowed-domains.
+    allow-subdomains:
+      type: boolean
+      default: False
+      description: >-
+        Specifies whether clients can request certificates for subdomains of
+        the CNs in allowed-domains, including wildcard subdomains.
+    allow-glob-domains:
+      type: boolean
+      default: True
+      description: >-
+        Specifies whether CNs in allowed-domains can contain glob patterns
+        (e.g., 'ftp*.example.com'), in which case clients will be able to
+        request certificates for any CN matching the glob pattern.
+    enforce-hostnames:
+      type: boolean
+      default: False
+      description: >-
+        Specifies if only valid host names are allowed
+        for CNs, DNS SANs, and the host part of email addresses.
+    max-ttl:
+      type: string
+      default: '696h'
+      description: >-
+        Specifies the maximum Time To Live for generated certificates.
+get-root-ca:
+  description: Get the root CA certificate
+disable-pki:
+  description: >-
+    Disable the PKI secrets backend.  This is needed if you wish to switch the CA type
+    after being set up via either upload-signed-csr or generate-root-ca.

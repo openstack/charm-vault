@@ -2,6 +2,8 @@ import base64
 import psycopg2
 import subprocess
 import tenacity
+import yaml
+from pathlib import Path
 
 
 from charmhelpers.contrib.charmsupport.nrpe import (
@@ -23,6 +25,7 @@ from charmhelpers.core.hookenv import (
     application_version_set,
     atexit,
     local_unit,
+    leader_set,
 )
 
 from charmhelpers.core.host import (
@@ -36,6 +39,8 @@ from charmhelpers.core.host import (
 from charmhelpers.core.templating import (
     render,
 )
+
+from charmhelpers.core import unitdata
 
 from charms.reactive import (
     hook,
@@ -634,67 +639,85 @@ def _assess_status():
     )
 
 
-@when('leadership.is_leader')
-@when_any('certificates.server.cert.requested',
-          'certificates.reissue.requested')
-def create_server_cert():
-    if not vault.vault_ready_for_clients():
-        log('Unable to process new secret backend requests,'
-            ' deferring until vault is fully configured', level=DEBUG)
-        return
-    reissue_requested = is_flag_set('certificates.reissue.requested')
+@when('leadership.is_leader',
+      'config.set.auto-generate-root-ca-cert')
+@when_not('charm.vault.ca.ready')
+def auto_generate_root_ca_cert():
+    actions_yaml = yaml.load(Path('actions.yaml').read_text())
+    props = actions_yaml['generate-root-ca']['properties']
+    action_config = {key: value['default'] for key, value in props.items()}
+    try:
+        root_ca = vault_pki.generate_root_ca(
+            ttl=action_config['ttl'],
+            allow_any_name=action_config['allow-any-name'],
+            allowed_domains=action_config['allowed-domains'],
+            allow_bare_domains=action_config['allow-bare-domains'],
+            allow_subdomains=action_config['allow-subdomains'],
+            allow_glob_domains=action_config['allow-glob-domains'],
+            enforce_hostnames=action_config['enforce-hostnames'],
+            max_ttl=action_config['max-ttl'])
+        leader_set({'root-ca': root_ca})
+        set_flag('charm.vault.ca.ready')
+    except vault.VaultError as e:
+        log("Skipping auto-generate root CA cert: {}".format(e))
+
+
+@when('leadership.is_leader',
+      'charm.vault.ca.ready',
+      'certificates.available')
+def publish_ca_info():
     tls = endpoint_from_flag('certificates.available')
-    server_requests = tls.get_server_requests()
-    for unit_name, request in server_requests.items():
-        log(
-            'Processing certificate requests from {}'.format(unit_name),
-            level=DEBUG)
-        # Process request for a single certificate
-        cn = request.get('common_name')
-        sans = request.get('sans')
-        if cn and sans:
-            log(
-                'Processing single certificate requests for {}'.format(cn),
-                level=DEBUG)
-            try:
-                bundle = vault_pki.process_cert_request(
-                    cn,
-                    sans,
-                    unit_name,
-                    reissue_requested)
-            except vault.VaultNotReady:
-                # Cannot continue if vault is not ready
-                return
-            # Set the certificate and key for the unit on the relationship.
-            tls.set_server_cert(
-                unit_name,
-                bundle['certificate'],
-                bundle['private_key'])
-        # Process request for a batch of certificates
-        cert_requests = request.get('cert_requests')
-        if cert_requests:
-            log(
-                'Processing batch of requests from {}'.format(unit_name),
-                level=DEBUG)
-            for cn, crequest in cert_requests.items():
-                log('Processing requests for {}'.format(cn), level=DEBUG)
-                try:
-                    bundle = vault_pki.process_cert_request(
-                        cn,
-                        crequest.get('sans'),
-                        unit_name,
-                        reissue_requested)
-                except vault.VaultNotReady:
-                    # Cannot continue if vault is not ready
-                    return
-                tls.add_server_cert(
-                    unit_name,
-                    cn,
-                    bundle['certificate'],
-                    bundle['private_key'])
-            tls.set_server_multicerts(unit_name)
-        tls.set_ca(vault_pki.get_ca())
-        chain = vault_pki.get_chain()
-        if chain:
-            tls.set_chain(chain)
+    tls.set_ca(vault_pki.get_ca())
+    chain = vault_pki.get_chain()
+    if chain:
+        tls.set_chain(chain)
+
+
+@when('leadership.is_leader',
+      'charm.vault.ca.ready',
+      'certificates.available')
+def publish_global_client_cert():
+    """
+    This is for backwards compatibility with older tls-certificate clients
+    only.  Obviously, it's not good security / design to have clients sharing
+    a certificate, but it seems that there are clients that depend on this
+    (though some, like etcd, only block on the flag that it triggers but don't
+    actually use the cert), so we have to set it for now.
+    """
+    cert_created = is_flag_set('charm.vault.global-client-cert.created')
+    reissue_requested = is_flag_set('certificates.reissue.global.requested')
+    tls = endpoint_from_flag('certificates.available')
+    if not cert_created or reissue_requested:
+        bundle = vault_pki.generate_certificate('client',
+                                                'global-client',
+                                                [])
+        unitdata.kv().set('charm.vault.global-client-cert', bundle)
+        set_flag('charm.vault.global-client-cert.created')
+        clear_flag('certificates.reissue.global.requested')
+    else:
+        bundle = unitdata.kv().get('charm.vault.global-client-cert')
+    tls.set_client_cert(bundle['certificate'], bundle['private_key'])
+
+
+@when('leadership.is_leader',
+      'charm.vault.ca.ready')
+@when_any('certificates.certs.requested',
+          'certificates.reissue.requested')
+def create_certs():
+    reissue_requested = is_flag_set('certificates.reissue.requested')
+    tls = endpoint_from_flag('certificates.certs.requested')
+    requests = tls.all_requests if reissue_requested else tls.new_requests
+    if reissue_requested:
+        log('Reissuing all certs')
+    for request in requests:
+        log('Processing certificate request from {} for {}'.format(
+            request.unit_name, request.common_name))
+        try:
+            bundle = vault_pki.generate_certificate(request.cert_type,
+                                                    request.common_name,
+                                                    request.sans)
+            request.set_cert(bundle['certificate'], bundle['private_key'])
+        except vault.VaultInvalidRequest as e:
+            log(str(e), level=ERROR)
+            continue  # TODO: report failure back to client
     clear_flag('certificates.reissue.requested')
