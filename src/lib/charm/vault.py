@@ -239,7 +239,7 @@ def prepare_vault():
     vault_health = get_vault_health()
     if not vault_health['initialized'] and hookenv.is_leader():
         initialize_vault()
-    if vault_health['sealed']:
+    if vault_health['sealed'] and hookenv.leader_get('keys'):
         unseal_vault()
     if hookenv.is_leader():
         role_id = setup_charm_vault_access()

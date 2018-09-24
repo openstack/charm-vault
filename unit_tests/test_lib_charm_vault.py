@@ -179,6 +179,7 @@ class TestLibCharmVault(unit_tests.test_utils.CharmTestCase):
             "http://127.0.0.1:8220/v1/sys/health")
         mock_response.json.assert_called_once()
 
+    @patch.object(vault.hookenv, 'leader_get')
     @patch.object(vault.hookenv, 'leader_set')
     @patch.object(vault, 'setup_charm_vault_access')
     @patch.object(vault.hookenv, 'is_leader')
@@ -189,8 +190,10 @@ class TestLibCharmVault(unit_tests.test_utils.CharmTestCase):
     @patch.object(vault.host, 'service_running')
     def test_prepare_vault(self, service_running, log, get_vault_health,
                            initialize_vault, unseal_vault, is_leader,
-                           setup_charm_vault_access, leader_set):
+                           setup_charm_vault_access, leader_set,
+                           leader_get):
         is_leader.return_value = True
+        leader_get.return_value = "[]"
         service_running.return_value = True
         get_vault_health.return_value = {
             'initialized': False,
@@ -204,6 +207,7 @@ class TestLibCharmVault(unit_tests.test_utils.CharmTestCase):
             {vault.CHARM_ACCESS_ROLE_ID: mock.ANY}
         )
 
+    @patch.object(vault.hookenv, 'leader_get')
     @patch.object(vault.hookenv, 'leader_set')
     @patch.object(vault.hookenv, 'is_leader')
     @patch.object(vault, 'unseal_vault')
@@ -213,7 +217,9 @@ class TestLibCharmVault(unit_tests.test_utils.CharmTestCase):
     @patch.object(vault.host, 'service_running')
     def test_prepare_vault_non_leader(self, service_running, log,
                                       get_vault_health, initialize_vault,
-                                      unseal_vault, is_leader, leader_set):
+                                      unseal_vault, is_leader, leader_set,
+                                      leader_get):
+        leader_get.return_value = "[]"
         is_leader.return_value = False
         service_running.return_value = True
         get_vault_health.return_value = {
@@ -234,6 +240,7 @@ class TestLibCharmVault(unit_tests.test_utils.CharmTestCase):
         self.assertFalse(initialize_vault.called)
         self.assertFalse(unseal_vault.called)
 
+    @patch.object(vault.hookenv, 'leader_get')
     @patch.object(vault.hookenv, 'leader_set')
     @patch.object(vault, 'setup_charm_vault_access')
     @patch.object(vault.hookenv, 'is_leader')
@@ -246,7 +253,8 @@ class TestLibCharmVault(unit_tests.test_utils.CharmTestCase):
                                        get_vault_health, initialize_vault,
                                        unseal_vault, is_leader,
                                        setup_charm_vault_access,
-                                       leader_set):
+                                       leader_set, leader_get):
+        leader_get.return_value = "[]"
         is_leader.return_value = False
         service_running.return_value = True
         get_vault_health.return_value = {
