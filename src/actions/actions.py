@@ -86,6 +86,7 @@ def upload_signed_csr(*args):
 def reissue_certificates(*args):
     charms.reactive.set_flag('certificates.reissue.requested')
 
+
 # Actions to function mapping, to allow for illegal python action names that
 # can map to a python function.
 ACTIONS = {
