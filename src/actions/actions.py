@@ -16,6 +16,7 @@
 import base64
 import os
 import sys
+from traceback import format_exc
 
 # Load modules from $CHARM_DIR/lib
 sys.path.append('lib')
@@ -25,6 +26,7 @@ basic.bootstrap_charm_deps()
 basic.init_config_states()
 
 import charmhelpers.core.hookenv as hookenv
+import charmhelpers.core.unitdata as unitdata
 
 import charm.vault as vault
 import charm.vault_pki as vault_pki
@@ -81,10 +83,43 @@ def upload_signed_csr(*args):
         enforce_hostnames=action_config.get('enforce-hostnames'),
         allow_any_name=action_config.get('allow-any-name'),
         max_ttl=action_config.get('max-ttl'))
+    set_flag('charm.vault.ca.ready')
+
+
+def generate_root_ca(*args):
+    if not hookenv.is_leader():
+        hookenv.action_fail('Please run action on lead unit')
+        return
+
+    action_config = hookenv.action_get()
+    root_ca = vault_pki.generate_root_ca(
+        ttl=action_config['ttl'],
+        allow_any_name=action_config['allow-any-name'],
+        allowed_domains=action_config['allowed-domains'],
+        allow_bare_domains=action_config['allow-bare-domains'],
+        allow_subdomains=action_config['allow-subdomains'],
+        allow_glob_domains=action_config['allow-glob-domains'],
+        enforce_hostnames=action_config['enforce-hostnames'],
+        max_ttl=action_config['max-ttl'])
+    hookenv.leader_set({'root-ca': root_ca})
+    hookenv.action_set({'output': root_ca})
+    set_flag('charm.vault.ca.ready')
+
+
+def get_root_ca(*args):
+    hookenv.action_set({'output': vault_pki.get_ca()})
+
+
+def disable_pki(*args):
+    if not hookenv.is_leader():
+        hookenv.action_fail('Please run action on lead unit')
+        return
+    vault_pki.disable_pki_backend()
 
 
 def reissue_certificates(*args):
     charms.reactive.set_flag('certificates.reissue.requested')
+    charms.reactive.set_flag('certificates.reissue.global.requested')
 
 
 # Actions to function mapping, to allow for illegal python action names that
@@ -95,6 +130,9 @@ ACTIONS = {
     "get-csr": get_intermediate_csrs,
     "upload-signed-csr": upload_signed_csr,
     "reissue-certificates": reissue_certificates,
+    "generate-root-ca": generate_root_ca,
+    "get-root-ca": get_root_ca,
+    "disable-pki": disable_pki,
 }
 
 
@@ -107,10 +145,22 @@ def main(args):
     else:
         try:
             action(args)
-        except Exception as e:
+        except vault.VaultError as e:
             hookenv.action_fail(str(e))
+        except Exception:
+            exc = format_exc()
+            hookenv.log(exc, hookenv.ERROR)
+            hookenv.action_fail(exc.splitlines()[-1])
         else:
-            charms.reactive.main()
+            # we were successful, so commit changes from the action
+            unitdata.kv().flush()
+            # try running handlers based on new state
+            try:
+                charms.reactive.main()
+            except Exception:
+                exc = format_exc()
+                hookenv.log(exc, hookenv.ERROR)
+                hookenv.action_fail(exc.splitlines()[-1])
 
 
 if __name__ == "__main__":

@@ -83,13 +83,28 @@ VAULT_LOCALHOST_URL = "http://127.0.0.1:8220"
 VAULT_HEALTH_URL = '{vault_addr}/v1/sys/health'
 
 
-class VaultNotReady(Exception):
-    """Exception raised for units in error state
+class VaultError(Exception):
+    """
+    Exception raised for Vault errors.
+    """
+    pass
+
+
+class VaultNotReady(VaultError):
+    """
+    Exception raised for units in error state
     """
 
     def __init__(self, reason):
         message = "Vault is not ready ({})".format(reason)
         super(VaultNotReady, self).__init__(message)
+
+
+class VaultInvalidRequest(VaultError):
+    """
+    Exception raised if a cert request can't be fulfilled.
+    """
+    pass
 
 
 def binding_address(binding):
@@ -203,7 +218,7 @@ def get_local_client():
     return client
 
 
-@tenacity.retry(wait=tenacity.wait_exponential(multiplier=1, max=10),
+@tenacity.retry(wait=tenacity.wait_exponential(multiplier=1, max=60),
                 stop=tenacity.stop_after_attempt(10),
                 reraise=True)
 def get_vault_health():
