@@ -74,6 +74,9 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         ]
         self.patch_all()
         self.is_container.return_value = False
+        self.kv = mock.MagicMock()
+        self.kv.get.return_value = False
+        self.unitdata.kv.return_value = self.kv
 
     def test_ssl_available(self):
         self.assertFalse(handlers.ssl_available({
@@ -563,8 +566,8 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         hvac_client.auth_approle.assert_called_once_with('local-approle')
         _vault.configure_secret_backend.assert_has_calls([
             mock.call(hvac_client, name='charm-vaultlocker'),
-            mock.call(hvac_client, name='charm-supersecrets')
-        ])
+            mock.call(hvac_client, name='charm-supersecrets'),
+        ], any_order=True)
 
         _vault.configure_policy.assert_has_calls([
             mock.call(hvac_client, name='charm-ceph-osd-0', hcl=mock.ANY),

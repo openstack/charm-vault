@@ -584,6 +584,12 @@ def _assess_status():
                    'vip and dns-ha-access-record configured')
         return
 
+    if unitdata.kv().get('charm.vault.series-upgrading'):
+        status_set("blocked",
+                   "Ready for do-release-upgrade and reboot. "
+                   "Set complete when finished.")
+        return
+
     health = None
     if service_running('vault'):
         health = vault.get_vault_health()
@@ -721,3 +727,19 @@ def create_certs():
             log(str(e), level=ERROR)
             continue  # TODO: report failure back to client
     clear_flag('certificates.reissue.requested')
+
+
+# Series upgrade hooks are a special case and reacting to the hook directly
+# makes sense as we may not want other charm code to run
+@hook('pre-series-upgrade')
+def pre_series_upgrade():
+    """Handler for pre-series-upgrade.
+    """
+    unitdata.kv().set('charm.vault.series-upgrading', True)
+
+
+@hook('post-series-upgrade')
+def post_series_upgrade():
+    """Handler for post-series-upgrade.
+    """
+    unitdata.kv().set('charm.vault.series-upgrading', False)
