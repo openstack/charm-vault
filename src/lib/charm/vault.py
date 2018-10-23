@@ -72,11 +72,17 @@ SECRET_BACKEND_HCL = """
 path "{backend}/{hostname}/*" {{
   capabilities = ["create", "read", "update", "delete", "list"]
 }}
+path "sys/internal/ui/mounts/{backend}" {{
+  capabilities = ["read"]
+}}
 """
 
 SECRET_BACKEND_SHARED_HCL = """
 path "{backend}/*" {{
   capabilities = ["create", "read", "update", "delete", "list"]
+}}
+path "sys/internal/ui/mounts/{backend}" {{
+  capabilities = ["read"]
 }}
 """
 VAULT_LOCALHOST_URL = "http://127.0.0.1:8220"
