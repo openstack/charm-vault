@@ -342,7 +342,8 @@ class TestLibCharmVault(unit_tests.test_utils.CharmTestCase):
         hvac_client.enable_secret_backend.assert_called_once_with(
             backend_type='kv',
             description=mock.ANY,
-            mount_point='test')
+            mount_point='test',
+            options={'version': 2})
 
     def test_configure_secret_backend_noop(self):
         hvac_client = mock.MagicMock()

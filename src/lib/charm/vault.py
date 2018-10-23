@@ -327,7 +327,8 @@ def configure_secret_backend(client, name):
     if '{}/'.format(name) not in client.list_secret_backends():
         client.enable_secret_backend(backend_type='kv',
                                      description='Charm created KV backend',
-                                     mount_point=name)
+                                     mount_point=name,
+                                     options={'version': 2})
 
 
 def configure_policy(client, name, hcl):
