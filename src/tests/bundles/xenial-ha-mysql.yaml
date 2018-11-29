@@ -3,13 +3,13 @@ services:
   vault:
     num_units: 3
     series: xenial
-    charm: cs:vault
+    charm: vault
     options:
         vip: 'ADD YOUR VIP HERE'
   hacluster:
-    charm: cs:hacluster
+    charm: cs:~openstack-charmers-next/hacluster
   mysql:
-    charm: cs:mysql
+    charm: cs:~openstack-charmers-next/percona-cluster
     num_units: 1
   easyrsa:
     charm: cs:~containers/easyrsa
