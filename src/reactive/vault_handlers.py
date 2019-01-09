@@ -274,18 +274,18 @@ def configure_ssl():
     c = config()
     if ssl_available(c):
         status_set('maintenance', 'installing SSL key and cert')
-        ssl_key = base64.decodestring(c['ssl-key'].encode())
+        ssl_key = base64.decodebytes(c['ssl-key'].encode())
         write_file('/var/snap/vault/common/vault.key', ssl_key, perms=0o600)
-        ssl_cert = base64.decodestring(c['ssl-cert'].encode())
+        ssl_cert = base64.decodebytes(c['ssl-cert'].encode())
         if c['ssl-chain']:
-            ssl_cert = ssl_cert + base64.decodestring(c['ssl-chain'].encode())
+            ssl_cert = ssl_cert + base64.decodebytes(c['ssl-chain'].encode())
         write_file('/var/snap/vault/common/vault.crt', ssl_cert, perms=0o600)
         set_state('vault.ssl.available')
     else:
         remove_state('vault.ssl.available')
 
     if c['ssl-ca']:
-        ssl_ca = base64.decodestring(c['ssl-ca'].encode())
+        ssl_ca = base64.decodebytes(c['ssl-ca'].encode())
         write_file('/usr/local/share/ca-certificates/vault-ca.crt',
                    ssl_ca, perms=0o644)
         subprocess.check_call(['update-ca-certificates', '--fresh'])
