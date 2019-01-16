@@ -745,3 +745,9 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         assert service_running.call_count == 2
         set_flag.assert_called_once_with('started')
         prepare_vault.assert_called_once_with()
+
+    @mock.patch.object(handlers, 'vault_pki')
+    def test_tune_pki_backend(self, vault_pki):
+        handlers.tune_pki_backend()
+        vault_pki.tune_pki_backend.assert_called_once_with()
+        self.set_flag.assert_called_once_with('pki.backend.tuned')

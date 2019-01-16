@@ -25,8 +25,8 @@ def configure_pki_backend(client, name, ttl=None):
             backend_type='pki',
             description='Charm created PKI backend',
             mount_point=name,
-            # Default ttl to 1 Year
-            config={'max-lease-ttl': ttl or '87600h'})
+            # Default ttl to 10 years
+            config={'max_lease_ttl': ttl or '87600h'})
 
 
 def disable_pki_backend():
@@ -35,6 +35,20 @@ def disable_pki_backend():
     client = vault.get_local_client()
     if vault.is_backend_mounted(client, CHARM_PKI_MP):
         client.disable_secret_backend(CHARM_PKI_MP)
+
+
+def tune_pki_backend(ttl=None):
+    """Assert tuning options for Charm PKI backend
+
+    :param ttl: TTL
+    :type ttl: str
+    """
+    client = vault.get_local_client()
+    if vault.is_backend_mounted(client, CHARM_PKI_MP):
+        client.tune_secret_backend(
+            backend_type='pki',
+            mount_point=CHARM_PKI_MP,
+            max_lease_ttl=ttl or '87600h')
 
 
 def is_ca_ready(client, name, role):
