@@ -23,5 +23,8 @@ target_deploy_status:
   ceph-osd:
     workload-status: waiting
     workload-status-message: "Incomplete relation: vault"
+  ceph-mon:
+    workload-status: waiting
+    workload-status-message: "Monitor bootstrapped but waiting for number of OSDs to reach expected-osd-count (3)"
 tests:
 - zaza.charm_tests.vault.tests.VaultTest

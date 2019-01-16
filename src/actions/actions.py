@@ -84,6 +84,7 @@ def upload_signed_csr(*args):
         allow_any_name=action_config.get('allow-any-name'),
         max_ttl=action_config.get('max-ttl'))
     set_flag('charm.vault.ca.ready')
+    set_flag('pki.backend.tuned')
 
 
 def generate_root_ca(*args):
@@ -104,6 +105,7 @@ def generate_root_ca(*args):
     hookenv.leader_set({'root-ca': root_ca})
     hookenv.action_set({'output': root_ca})
     set_flag('charm.vault.ca.ready')
+    set_flag('pki.backend.tuned')
 
 
 def get_root_ca(*args):

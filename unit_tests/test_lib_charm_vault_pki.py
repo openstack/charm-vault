@@ -25,7 +25,7 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
             ttl=42)
         client_mock.enable_secret_backend.assert_called_once_with(
             backend_type='pki',
-            config={'max-lease-ttl': 42},
+            config={'max_lease_ttl': 42},
             description='Charm created PKI backend',
             mount_point='my_backend')
 
@@ -38,7 +38,7 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
             'my_backend')
         client_mock.enable_secret_backend.assert_called_once_with(
             backend_type='pki',
-            config={'max-lease-ttl': '87600h'},
+            config={'max_lease_ttl': '87600h'},
             description='Charm created PKI backend',
             mount_point='my_backend')
 
@@ -364,3 +364,20 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
                 'admin.local',
                 'public.local']),
             (['10.0.0.10', '10.0.0.20'], ['admin.local', 'public.local']))
+
+    @patch.object(vault_pki.vault, 'get_local_client')
+    @patch.object(vault_pki.vault, 'is_backend_mounted')
+    def test_tune_secret_backend(self,
+                                 is_backend_mounted,
+                                 get_local_client):
+        is_backend_mounted.return_value = True
+        mock_client = mock.MagicMock()
+        get_local_client.return_value = mock_client
+        vault_pki.tune_pki_backend(ttl='3456h')
+        is_backend_mounted.assert_called_with(mock_client,
+                                              vault_pki.CHARM_PKI_MP)
+        mock_client.tune_secret_backend.assert_called_with(
+            backend_type='pki',
+            mount_point=vault_pki.CHARM_PKI_MP,
+            max_lease_ttl='3456h'
+        )

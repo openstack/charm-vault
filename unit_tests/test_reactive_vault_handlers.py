@@ -730,3 +730,9 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         tls.new_requests[2].set_cert.assert_has_calls([
             mock.call('crt2', 'key2'),
         ])
+
+    @mock.patch.object(handlers, 'vault_pki')
+    def test_tune_pki_backend(self, vault_pki):
+        handlers.tune_pki_backend()
+        vault_pki.tune_pki_backend.assert_called_once_with()
+        self.set_flag.assert_called_once_with('pki.backend.tuned')

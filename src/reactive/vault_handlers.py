@@ -743,3 +743,13 @@ def post_series_upgrade():
     """Handler for post-series-upgrade.
     """
     unitdata.kv().set('charm.vault.series-upgrading', False)
+
+
+@when('leadership.is_leader',
+      'charm.vault.ca.ready')
+@when_not('pki.backend.tuned')
+def tune_pki_backend():
+    """Ensure Vault PKI backend is correctly tuned
+    """
+    vault_pki.tune_pki_backend()
+    set_flag('pki.backend.tuned')
