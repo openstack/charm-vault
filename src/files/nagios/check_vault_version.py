@@ -15,7 +15,8 @@ import sys
 from textwrap import dedent
 from urllib.request import urlopen
 
-VAULT_HEALTH_URL = 'https://127.0.0.1:8200/v1/sys/health'
+# lp:1814323
+VAULT_HEALTH_URL = '{0}://127.0.0.1:8200/v1/sys/health?standbyok=true'
 VAULT_VERIFY_SSL = False
 
 SNAPD_INFO_REQUEST = dedent("""\
@@ -46,8 +47,18 @@ def get_vault_server_version(verify=True):
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
-    with urlopen(VAULT_HEALTH_URL, context=ctx) as health:
-        return json.loads(health.read().decode('utf-8'))['version']
+
+    err = {}
+    for proto in ['https', 'http']:  # lp:1813989
+        try:
+            health_url = VAULT_HEALTH_URL.format(proto)
+            with urlopen(health_url, context=ctx) as health:
+                return json.loads(health.read().decode('utf-8'))['version']
+        except Exception as e:
+            err[proto] = str(e)
+            continue
+
+    raise Exception('Multiple errors occured: %s' % err)
 
 
 if __name__ == '__main__':
