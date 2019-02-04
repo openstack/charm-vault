@@ -15,7 +15,7 @@ import sys
 from textwrap import dedent
 from urllib.request import urlopen
 
-VAULT_HEALTH_URL = 'https://127.0.0.1:8200/v1/sys/health'
+VAULT_HEALTH_URL = 'http://127.0.0.1:8220/v1/sys/health?standbyok=true'
 VAULT_VERIFY_SSL = False
 
 SNAPD_INFO_REQUEST = dedent("""\
@@ -46,6 +46,7 @@ def get_vault_server_version(verify=True):
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
+
     with urlopen(VAULT_HEALTH_URL, context=ctx) as health:
         return json.loads(health.read().decode('utf-8'))['version']
 
