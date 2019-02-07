@@ -730,3 +730,18 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         tls.new_requests[2].set_cert.assert_has_calls([
             mock.call('crt2', 'key2'),
         ])
+
+    @mock.patch.object(handlers, 'config')
+    @mock.patch.object(handlers, 'clear_flag')
+    @mock.patch.object(handlers, 'set_flag')
+    @mock.patch.object(handlers.vault, 'prepare_vault')
+    @mock.patch.object(handlers.vault, 'opportunistic_restart')
+    @mock.patch.object(handlers, 'service_running')
+    def test_start_vault(self, service_running, opportunistic_restart,
+                         prepare_vault, set_flag, clear_flag, config):
+        service_running.side_effect = [False, True]
+        config.return_value = True
+        handlers.start_vault()
+        assert service_running.call_count == 2
+        set_flag.assert_called_once_with('started')
+        prepare_vault.assert_called_once_with()

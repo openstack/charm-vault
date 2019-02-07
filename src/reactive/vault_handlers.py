@@ -2,6 +2,7 @@ import base64
 import psycopg2
 import subprocess
 import tenacity
+import traceback
 import yaml
 from pathlib import Path
 
@@ -48,7 +49,7 @@ from charms.reactive import (
     remove_state,
     set_state,
     when,
-    when_file_changed,
+    any_file_changed,
     when_not,
     when_any,
 )
@@ -188,6 +189,9 @@ def configure_vault(context):
     log("Opening vault port", level=DEBUG)
     open_port(8200)
     set_flag('configured')
+    if any_file_changed([VAULT_CONFIG, VAULT_SYSTEMD_CONFIG]):
+        # force a restart if config has changed
+        clear_flag('started')
 
 
 @when('snap.installed.vault')
@@ -369,12 +373,25 @@ def cluster_connected(hacluster):
     hacluster.bind_resources()
 
 
-@when_file_changed(VAULT_CONFIG, VAULT_SYSTEMD_CONFIG)
-def file_change_auto_unlock_mode():
-    log("Calling opportunistic_restart", level=DEBUG)
+@when('configured')
+@when_not('started')
+def start_vault():
+    # start or restart vault
     vault.opportunistic_restart()
-    if config('totally-unsecure-auto-unlock'):
-        vault.prepare_vault()
+
+    @tenacity.retry(wait=tenacity.wait_exponential(multiplier=1, max=10),
+                    stop=tenacity.stop_after_attempt(10),
+                    retry=tenacity.retry_if_result(lambda b: not b))
+    def _check_vault_running():
+        return service_running('vault')
+
+    if _check_vault_running():
+        set_flag('started')
+        clear_flag('failed.to.start')
+        if config('totally-unsecure-auto-unlock'):
+            vault.prepare_vault()
+    else:
+        set_flag('failed.to.start')
 
 
 @when('leadership.is_leader')
@@ -590,9 +607,19 @@ def _assess_status():
                    "Set complete when finished.")
         return
 
+    if is_flag_set('failed.to.start'):
+        status_set("blocked",
+                   "Vault failed to start; check journalctl -u vault")
+        return
+
     health = None
     if service_running('vault'):
-        health = vault.get_vault_health()
+        try:
+            health = vault.get_vault_health()
+        except Exception:
+            log(traceback.format_exc(), level=ERROR)
+            status_set('blocked', 'Vault health check failed')
+            return
     else:
         status_set('blocked', 'Vault service not running')
         return
