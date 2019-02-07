@@ -674,7 +674,8 @@ def _assess_status():
 
 @when('leadership.is_leader',
       'config.set.auto-generate-root-ca-cert')
-@when_not('charm.vault.ca.ready')
+@when_not('charm.vault.ca.ready',
+          'charm.vault.ca.auto-generated')
 def auto_generate_root_ca_cert():
     actions_yaml = yaml.load(Path('actions.yaml').read_text())
     props = actions_yaml['generate-root-ca']['properties']
@@ -691,6 +692,7 @@ def auto_generate_root_ca_cert():
             max_ttl=action_config['max-ttl'])
         leader_set({'root-ca': root_ca})
         set_flag('charm.vault.ca.ready')
+        set_flag('charm.vault.ca.auto-generated')
     except vault.VaultError as e:
         log("Skipping auto-generate root CA cert: {}".format(e))
 
@@ -733,12 +735,13 @@ def publish_global_client_cert():
 
 
 @when('leadership.is_leader',
-      'charm.vault.ca.ready')
+      'charm.vault.ca.ready',
+      'certificates.available')
 @when_any('certificates.certs.requested',
           'certificates.reissue.requested')
 def create_certs():
     reissue_requested = is_flag_set('certificates.reissue.requested')
-    tls = endpoint_from_flag('certificates.certs.requested')
+    tls = endpoint_from_flag('certificates.available')
     requests = tls.all_requests if reissue_requested else tls.new_requests
     if reissue_requested:
         log('Reissuing all certs')
