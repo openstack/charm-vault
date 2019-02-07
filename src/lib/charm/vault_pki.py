@@ -34,6 +34,11 @@ def disable_pki_backend():
     """
     client = vault.get_local_client()
     if vault.is_backend_mounted(client, CHARM_PKI_MP):
+        client.delete('{}/root'.format(CHARM_PKI_MP))
+        client.delete('{}/roles/{}'.format(CHARM_PKI_MP,
+                                           CHARM_PKI_ROLE_CLIENT))
+        client.delete('{}/roles/{}'.format(CHARM_PKI_MP,
+                                           CHARM_PKI_ROLE))
         client.disable_secret_backend(CHARM_PKI_MP)
 
 
@@ -117,6 +122,8 @@ def generate_certificate(cert_type, common_name, sans):
     try:
         response = client.write('{}/issue/{}'.format(CHARM_PKI_MP, role),
                                 **config)
+        if not response['data']:
+            raise vault.VaultError(response.get('warnings', 'unknown error'))
     except hvac.exceptions.InvalidRequest as e:
         raise vault.VaultInvalidRequest(str(e)) from e
     return response['data']
@@ -159,6 +166,8 @@ def get_csr(ttl=None, country=None, province=None,
     csr_info = client.write(
         '{}/intermediate/generate/internal'.format(CHARM_PKI_MP),
         **config)
+    if not csr_info['data']:
+        raise vault.VaultError(csr_info.get('warnings', 'unknown error'))
     return csr_info['data']['csr']
 
 
@@ -264,6 +273,8 @@ def generate_root_ca(ttl='87599h', allow_any_name=True, allowed_domains=None,
     csr_info = client.write(
         '{}/root/generate/internal'.format(CHARM_PKI_MP),
         **config)
+    if not csr_info['data']:
+        raise vault.VaultError(csr_info.get('warnings', 'unknown error'))
     cert = csr_info['data']['certificate']
     # Generated certificates can have the CRL location and the location of the
     # issuing certificate encoded.

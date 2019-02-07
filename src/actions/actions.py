@@ -32,7 +32,7 @@ import charm.vault as vault
 import charm.vault_pki as vault_pki
 import charms.reactive
 
-from charms.reactive.flags import set_flag
+from charms.reactive.flags import set_flag, clear_flag
 
 
 def authorize_charm_action(*args):
@@ -85,6 +85,9 @@ def upload_signed_csr(*args):
         max_ttl=action_config.get('max-ttl'))
     set_flag('charm.vault.ca.ready')
     set_flag('pki.backend.tuned')
+    # reissue any certificates we might previously have provided
+    set_flag('certificates.reissue.requested')
+    set_flag('certificates.reissue.global.requested')
 
 
 def generate_root_ca(*args):
@@ -106,6 +109,9 @@ def generate_root_ca(*args):
     hookenv.action_set({'output': root_ca})
     set_flag('charm.vault.ca.ready')
     set_flag('pki.backend.tuned')
+    # reissue any certificates we might previously have provided
+    set_flag('certificates.reissue.requested')
+    set_flag('certificates.reissue.global.requested')
 
 
 def get_root_ca(*args):
@@ -117,11 +123,13 @@ def disable_pki(*args):
         hookenv.action_fail('Please run action on lead unit')
         return
     vault_pki.disable_pki_backend()
+    clear_flag('charm.vault.ca.ready')
+    clear_flag('pki.backend.tuned')
 
 
 def reissue_certificates(*args):
-    charms.reactive.set_flag('certificates.reissue.requested')
-    charms.reactive.set_flag('certificates.reissue.global.requested')
+    set_flag('certificates.reissue.requested')
+    set_flag('certificates.reissue.global.requested')
 
 
 # Actions to function mapping, to allow for illegal python action names that
