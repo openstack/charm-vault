@@ -612,6 +612,23 @@ def _assess_status():
                    "Vault failed to start; check journalctl -u vault")
         return
 
+    _missing_interfaces = []
+    _incomplete_interfaces = []
+
+    _assess_interface_groups(REQUIRED_INTERFACES, optional=False,
+                             missing_interfaces=_missing_interfaces,
+                             incomplete_interfaces=_incomplete_interfaces)
+
+    _assess_interface_groups(OPTIONAL_INTERFACES, optional=True,
+                             missing_interfaces=_missing_interfaces,
+                             incomplete_interfaces=_incomplete_interfaces)
+
+    if _missing_interfaces or _incomplete_interfaces:
+        state = 'blocked' if _missing_interfaces else 'waiting'
+        status_set(state, ', '.join(_missing_interfaces +
+                                    _incomplete_interfaces))
+        return
+
     health = None
     if service_running('vault'):
         try:
@@ -629,23 +646,6 @@ def _assess_status():
     else:
         application_version_set('Unknown')
         status_set('blocked', 'Vault health check failed')
-        return
-
-    _missing_interfaces = []
-    _incomplete_interfaces = []
-
-    _assess_interface_groups(REQUIRED_INTERFACES, optional=False,
-                             missing_interfaces=_missing_interfaces,
-                             incomplete_interfaces=_incomplete_interfaces)
-
-    _assess_interface_groups(OPTIONAL_INTERFACES, optional=True,
-                             missing_interfaces=_missing_interfaces,
-                             incomplete_interfaces=_incomplete_interfaces)
-
-    if _missing_interfaces or _incomplete_interfaces:
-        state = 'blocked' if _missing_interfaces else 'waiting'
-        status_set(state, ', '.join(_missing_interfaces +
-                                    _incomplete_interfaces))
         return
 
     if not service_running('vault'):
