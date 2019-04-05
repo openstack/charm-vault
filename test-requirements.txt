@@ -9,7 +9,7 @@ coverage>=3.6
 git+https://github.com/openstack/charms.openstack.git#egg=charms-openstack
 netifaces   # vault
 hvac<0.7.0  # vault
-psycopg2    # vault
+psycopg2-binary    # vault
 tenacity    # vault
 pbr             # vault
 cryptography    # vault
