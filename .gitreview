@@ -1,6 +1,6 @@
 [gerrit]
-host=review.openstack.org
+host=review.opendev.org
 port=29418
-project=openstack/charm-vault.git
+project=x/charm-vault.git
 
 defaultbranch=stable/19.04
