@@ -12,5 +12,5 @@ includes:
 options:
   basic:
     packages:
-      - python3-psycopg2
       - libffi-dev
+      - libpq-dev

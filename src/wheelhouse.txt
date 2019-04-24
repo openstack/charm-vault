@@ -2,3 +2,8 @@ netifaces
 hvac<0.7.0
 tenacity
 pbr
+psycopg2
+requests
+
+jinja2
+psutil
