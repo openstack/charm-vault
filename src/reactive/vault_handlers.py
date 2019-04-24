@@ -492,7 +492,10 @@ def configure_secrets_backend():
 def send_vault_url_and_ca():
     secrets = endpoint_from_flag('secrets.connected')
     if is_flag_set('ha.available'):
-        vault_url = vault.get_api_url(address=config('vip'))
+        if config('hostname'):
+            vault_url = vault.get_api_url(address=config('hostname'))
+        else:
+            vault_url = vault.get_api_url(address=config('vip'))
     else:
         vault_url = vault.get_api_url()
     secrets.publish_url(vault_url=vault_url)
