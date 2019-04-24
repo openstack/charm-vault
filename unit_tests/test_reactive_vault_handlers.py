@@ -604,7 +604,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         ])
 
     @mock.patch.object(handlers, 'vault')
-    def send_vault_url_and_ca(self, _vault):
+    def test_send_vault_url_and_ca(self, _vault):
         _test_config = {
             'vip': '10.5.100.1',
             'ssl-ca': 'test-ca',
@@ -626,7 +626,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         )
 
     @mock.patch.object(handlers, 'vault')
-    def send_vault_url_and_ca_ha(self, _vault):
+    def test_send_vault_url_and_ca_ha(self, _vault):
         _test_config = {
             'vip': '10.5.100.1',
             'ssl-ca': 'test-ca',
@@ -642,6 +642,29 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         _vault.get_api_url.assert_called_once_with(address='10.5.100.1')
         mock_secrets.publish_url.assert_called_once_with(
             vault_url='http://10.5.100.1:8200'
+        )
+        mock_secrets.publish_ca.assert_called_once_with(
+            vault_ca='test-ca'
+        )
+
+    @mock.patch.object(handlers, 'vault')
+    def test_send_vault_url_and_ca_hostname(self, _vault):
+        _test_config = {
+            'vip': '10.5.100.1',
+            'ssl-ca': 'test-ca',
+            'hostname': 'vault',
+        }
+        self.config.side_effect = lambda key: _test_config.get(key)
+        mock_secrets = mock.MagicMock()
+        self.endpoint_from_flag.return_value = mock_secrets
+        self.is_flag_set.return_value = True
+        _vault.get_api_url.return_value = 'https://vault:8200'
+        handlers.send_vault_url_and_ca()
+        self.endpoint_from_flag.assert_called_with('secrets.connected')
+        self.is_flag_set.assert_called_with('ha.available')
+        _vault.get_api_url.assert_called_once_with(address='vault')
+        mock_secrets.publish_url.assert_called_once_with(
+            vault_url='https://vault:8200'
         )
         mock_secrets.publish_ca.assert_called_once_with(
             vault_ca='test-ca'
