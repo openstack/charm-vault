@@ -42,6 +42,10 @@ peers:
   cluster:
     interface: vault-ha
 resources:
+  core:
+    type: file
+    filename: core.snap
+    description: Core snap
   vault:
     type: file
     filename: vault.snap
