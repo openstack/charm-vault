@@ -14,8 +14,3 @@ options:
     packages:
       - python3-psycopg2
       - libffi-dev
-resources:
-  vault:
-    type: file
-    filename: vault.snap
-    description: Vault snap
