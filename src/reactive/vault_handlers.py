@@ -130,6 +130,7 @@ def snap_install():
     channel = config('channel') or 'stable'
     if validate_snap_channel(channel):
         clear_flag('snap.channel.invalid')
+        snap.install('core')
         snap.install('vault', channel=channel)
     else:
         set_flag('snap.channel.invalid')
