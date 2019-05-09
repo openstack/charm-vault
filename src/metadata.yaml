@@ -41,3 +41,8 @@ provides:
 peers:
   cluster:
     interface: vault-ha
+resources:
+  vault:
+    type: file
+    filename: vault.snap
+    description: Vault snap
