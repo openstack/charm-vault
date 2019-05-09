@@ -1,4 +1,5 @@
 # hvac 0.7.0 appears to be broken
 hvac<0.7.0
 # zaza
-git+https://github.com/openstack-charmers/zaza.git@namespace-tests#egg=zaza
+git+https://github.com/openstack-charmers/zaza.git@remove-namespaced-tests#egg=zaza
+git+https://github.com/openstack-charmers/zaza-openstack-tests.git#egg=zaza.openstack
