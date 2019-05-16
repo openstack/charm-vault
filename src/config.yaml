@@ -74,3 +74,10 @@ options:
       this will use all default values for the root CA cert.  If you want
       to adjust those values, you should use the generate-root-ca action
       instead.
+  hostname:
+    type: string
+    default:
+    description: >-
+      Hostname to be used for the API URL. This hostname should exist as a DNS
+      record and be resolvable by the charms that will consume the relation 
+      with vault.
