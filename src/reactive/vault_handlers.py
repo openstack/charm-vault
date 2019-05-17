@@ -354,17 +354,23 @@ def nagios_servicegroups_changed():
 @when('ha.connected')
 def cluster_connected(hacluster):
     """Configure HA resources in corosync"""
-    vip = config('vip')
     dns_record = config('dns-ha-access-record')
-    if vip and dns_record:
+    vips = config('vip') or None
+    if vips and dns_record:
         set_flag('config.dns_vip.invalid')
         log("Unsupported configuration. vip and dns-ha cannot both be set",
             level=ERROR)
         return
     else:
         clear_flag('config.dns_vip.invalid')
-    if vip:
-        hacluster.add_vip('vault', vip)
+
+    if vips:
+        vips = vips.split()
+        for vip in vips:
+            if vip == vault.get_vip(binding='external'):
+                hacluster.add_vip('vault-ext', vip)
+            else:
+                hacluster.add_vip('vault', vip)
     elif dns_record:
         try:
             ip = network_get_primary_address('access')
@@ -449,7 +455,7 @@ def configure_secrets_backend():
 
         unit = request['unit']
         hostname = request['hostname']
-        access_address = request['access_address']
+        access_address = request['ingress_address']
         isolated = request['isolated']
         unit_name = unit.unit_name.replace('/', '-')
         policy_name = approle_name = 'charm-{}'.format(unit_name)
@@ -492,14 +498,28 @@ def configure_secrets_backend():
 @when('secrets.connected')
 def send_vault_url_and_ca():
     secrets = endpoint_from_flag('secrets.connected')
+    vault_url_external = None
     if is_flag_set('ha.available'):
-        if config('hostname'):
-            vault_url = vault.get_api_url(address=config('hostname'))
+        hostname = config('hostname')
+        if hostname:
+            vault_url = vault.get_api_url(address=hostname)
         else:
-            vault_url = vault.get_api_url(address=config('vip'))
+            vip = vault.get_vip()
+            vault_url = vault.get_api_url(address=vip)
+            ext_vip = vault.get_vip(binding='external')
+            if ext_vip and ext_vip != vip:
+                vault_url_external = vault.get_api_url(address=ext_vip,
+                                                       binding='external')
     else:
         vault_url = vault.get_api_url()
-    secrets.publish_url(vault_url=vault_url)
+        vault_url_external = vault.get_api_url(binding='external')
+        if vault_url_external == vault_url:
+            vault_url_external = None
+
+    secrets.publish_url(vault_url=vault_url, remote_binding='access')
+    if vault_url_external:
+        secrets.publish_url(vault_url=vault_url_external,
+                            remote_binding='external')
 
     if config('ssl-ca'):
         secrets.publish_ca(vault_ca=config('ssl-ca'))

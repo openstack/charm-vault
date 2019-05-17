@@ -1,5 +1,5 @@
 import mock
-from unittest.mock import patch
+from unittest.mock import patch, call
 
 import charms.reactive
 
@@ -490,7 +490,8 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         self.assertFalse(handlers.validate_snap_channel('foobar'))
         self.assertFalse(handlers.validate_snap_channel('0.10/foobar'))
 
-    def test_cluster_connected_vip(self):
+    @mock.patch.object(handlers.vault, 'get_vip')
+    def test_cluster_connected_vip(self, mock_get_vip):
         charm_config = {
             'vip': '10.1.1.1'}
         self.config.side_effect = lambda x: charm_config.get(x)
@@ -532,6 +533,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             'hostname': 'juju-123456-0',
             'isolated': True,
             'access_address': '10.20.4.5',
+            'ingress_address': '10.20.4.5',
             'unit': mock.MagicMock()
         })
         test_requests[-1]['unit'].unit_name = 'ceph-osd/0'
@@ -541,6 +543,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             'hostname': 'juju-789012-0',
             'isolated': True,
             'access_address': '10.20.4.20',
+            'ingress_address': '10.20.4.20',
             'unit': mock.MagicMock()
         })
         test_requests[-1]['unit'].unit_name = 'omg/0'
@@ -603,68 +606,118 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             mock.call('secrets.refresh'),
         ])
 
-    @mock.patch.object(handlers, 'vault')
-    def test_send_vault_url_and_ca(self, _vault):
+    @mock.patch.object(handlers.vault.hookenv, 'network_get_primary_address')
+    def test_send_vault_url_and_ca(self, mock_network_get_primary_address):
         _test_config = {
-            'vip': '10.5.100.1',
             'ssl-ca': 'test-ca',
         }
         self.config.side_effect = lambda key: _test_config.get(key)
         mock_secrets = mock.MagicMock()
+
+        def fake_network_get(binding=None):
+            return '10.5.0.23'
+
+        mock_network_get_primary_address.side_effect = fake_network_get
         self.endpoint_from_flag.return_value = mock_secrets
         self.is_flag_set.return_value = False
-        _vault.get_api_url.return_value = 'http://10.5.0.23:8200'
         handlers.send_vault_url_and_ca()
         self.endpoint_from_flag.assert_called_with('secrets.connected')
         self.is_flag_set.assert_called_with('ha.available')
-        _vault.get_api_url.assert_called_once_with()
         mock_secrets.publish_url.assert_called_once_with(
-            vault_url='http://10.5.0.23:8200'
+            vault_url='http://10.5.0.23:8200',
+            remote_binding='access'
         )
         mock_secrets.publish_ca.assert_called_once_with(
             vault_ca='test-ca'
         )
 
-    @mock.patch.object(handlers, 'vault')
-    def test_send_vault_url_and_ca_ha(self, _vault):
+    @mock.patch.object(handlers.vault.hookenv, 'network_get_primary_address')
+    def test_send_vault_url_and_ca_ext(self, mock_network_get_primary_address):
         _test_config = {
-            'vip': '10.5.100.1',
             'ssl-ca': 'test-ca',
         }
         self.config.side_effect = lambda key: _test_config.get(key)
         mock_secrets = mock.MagicMock()
+
+        def fake_network_get(binding=None):
+            if binding == 'external':
+                return '10.6.0.23'
+
+            return '10.5.0.23'
+
+        mock_network_get_primary_address.side_effect = fake_network_get
         self.endpoint_from_flag.return_value = mock_secrets
-        self.is_flag_set.return_value = True
-        _vault.get_api_url.return_value = 'http://10.5.100.1:8200'
+        self.is_flag_set.return_value = False
         handlers.send_vault_url_and_ca()
         self.endpoint_from_flag.assert_called_with('secrets.connected')
         self.is_flag_set.assert_called_with('ha.available')
-        _vault.get_api_url.assert_called_once_with(address='10.5.100.1')
-        mock_secrets.publish_url.assert_called_once_with(
-            vault_url='http://10.5.100.1:8200'
+        mock_secrets.publish_url.assert_has_calls(
+            [call(vault_url='http://10.5.0.23:8200',
+                  remote_binding='access'),
+             call(vault_url='http://10.6.0.23:8200',
+                  remote_binding='external')]
         )
         mock_secrets.publish_ca.assert_called_once_with(
             vault_ca='test-ca'
         )
 
-    @mock.patch.object(handlers, 'vault')
-    def test_send_vault_url_and_ca_hostname(self, _vault):
+    @mock.patch('charmhelpers.contrib.network.ip.get_netmask_for_address')
+    @mock.patch.object(handlers.vault.hookenv, 'config')
+    @mock.patch.object(handlers.vault.hookenv, 'network_get_primary_address')
+    def test_send_vault_url_and_ca_ha(self,
+                                      mock_network_get_primary_address,
+                                      mock_config,
+                                      mock_get_netmask_for_address):
         _test_config = {
-            'vip': '10.5.100.1',
+            'vip': '10.5.100.1 10.6.100.1',
+            'ssl-ca': 'test-ca',
+            'hostname': None
+        }
+        mock_get_netmask_for_address.return_value = 16
+        self.config.side_effect = lambda key: _test_config.get(key)
+        mock_config.side_effect = lambda key: _test_config.get(key)
+
+        mock_secrets = mock.MagicMock()
+
+        def fake_network_get(binding=None):
+            if binding == 'external':
+                return '10.6.0.23'
+
+            return '10.5.0.23'
+
+        mock_network_get_primary_address.side_effect = fake_network_get
+
+        self.endpoint_from_flag.return_value = mock_secrets
+        self.is_flag_set.return_value = True
+        handlers.send_vault_url_and_ca()
+        self.endpoint_from_flag.assert_called_with('secrets.connected')
+        self.is_flag_set.assert_called_with('ha.available')
+        mock_secrets.publish_url.assert_has_calls(
+            [call(vault_url='http://10.5.100.1:8200',
+                  remote_binding='access'),
+             call(vault_url='http://10.6.100.1:8200',
+                  remote_binding='external')]
+        )
+        mock_secrets.publish_ca.assert_called_once_with(
+            vault_ca='test-ca'
+        )
+
+    def test_send_vault_url_and_ca_hostname(self):
+        _test_config = {
             'ssl-ca': 'test-ca',
             'hostname': 'vault',
         }
         self.config.side_effect = lambda key: _test_config.get(key)
+
         mock_secrets = mock.MagicMock()
+
         self.endpoint_from_flag.return_value = mock_secrets
         self.is_flag_set.return_value = True
-        _vault.get_api_url.return_value = 'https://vault:8200'
         handlers.send_vault_url_and_ca()
         self.endpoint_from_flag.assert_called_with('secrets.connected')
         self.is_flag_set.assert_called_with('ha.available')
-        _vault.get_api_url.assert_called_once_with(address='vault')
-        mock_secrets.publish_url.assert_called_once_with(
-            vault_url='https://vault:8200'
+        mock_secrets.publish_url.assert_has_calls(
+            [call(vault_url='http://vault:8200', remote_binding='access')]
         )
         mock_secrets.publish_ca.assert_called_once_with(
             vault_ca='test-ca'
