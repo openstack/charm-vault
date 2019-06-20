@@ -14,3 +14,4 @@ options:
     packages:
       - python3-psycopg2
       - libffi-dev
+repo: https://github.com/openstack/charm-vault.git
