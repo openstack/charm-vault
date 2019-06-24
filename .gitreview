@@ -1,4 +1,4 @@
 [gerrit]
 host=review.opendev.org
 port=29418
-project=x/charm-vault.git
+project=openstack/charm-vault.git
