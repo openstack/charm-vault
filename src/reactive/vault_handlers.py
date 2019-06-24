@@ -713,10 +713,6 @@ def _assess_status():
                              missing_interfaces=_missing_interfaces,
                              incomplete_interfaces=_incomplete_interfaces)
 
-    _assess_interface_groups(OPTIONAL_INTERFACES, optional=True,
-                             missing_interfaces=_missing_interfaces,
-                             incomplete_interfaces=_incomplete_interfaces)
-
     if _missing_interfaces or _incomplete_interfaces:
         state = 'blocked' if _missing_interfaces else 'waiting'
         status_set(state, ', '.join(_missing_interfaces +
@@ -758,6 +754,22 @@ def _assess_status():
 
     if not client_approle_authorized():
         status_set('blocked', 'Vault cannot authorize approle')
+        return
+
+    has_ca = is_flag_set('charm.vault.ca.ready')
+    has_cert_reqs = is_flag_set('certificates.certs.requested')
+    if has_cert_reqs and not has_ca:
+        status_set('blocked', 'Missing CA cert')
+        return
+
+    _assess_interface_groups(OPTIONAL_INTERFACES, optional=True,
+                             missing_interfaces=_missing_interfaces,
+                             incomplete_interfaces=_incomplete_interfaces)
+
+    if _missing_interfaces or _incomplete_interfaces:
+        state = 'blocked' if _missing_interfaces else 'waiting'
+        status_set(state, ', '.join(_missing_interfaces +
+                                    _incomplete_interfaces))
         return
 
     mlock_disabled = is_container() or config('disable-mlock')
@@ -859,7 +871,11 @@ def publish_ca_info():
         log("Unable to publish ca info, service sealed.")
     else:
         tls.set_ca(vault_pki.get_ca())
-        chain = vault_pki.get_chain()
+        try:
+            # this might fail if we were restarted and need to be unsealed
+            chain = vault_pki.get_chain()
+        except vault.hvac.exceptions.VaultDown:
+            chain = None
         if chain:
             tls.set_chain(chain)
 
