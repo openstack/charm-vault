@@ -702,6 +702,15 @@ def auto_generate_root_ca_cert():
 
 
 @when('leadership.is_leader',
+      'leadership.set.root-ca')
+@when_not('charm.vault.ca.ready')
+def takeover_cert_leadership():
+    # the CA was configured by a previous leader, but we're the leader now so
+    # we need to take over cert management duties
+    set_flag('charm.vault.ca.ready')
+
+
+@when('leadership.is_leader',
       'charm.vault.ca.ready',
       'certificates.available')
 def publish_ca_info():
