@@ -19,6 +19,10 @@ import requests
 import hvac
 import tenacity
 
+from charmhelpers.contrib.network.ip import (
+    is_address_in_network,
+    resolve_network_cidr,
+)
 import charmhelpers.core.hookenv as hookenv
 import charmhelpers.core.host as host
 import charms.reactive
@@ -134,10 +138,32 @@ get_cluster_url = functools.partial(get_vault_url,
                                     binding='cluster', port=8201)
 
 
+def get_vip(binding=None):
+    vip = hookenv.config('vip')
+    if not vip:
+        return None
+
+    vips = vip.split()
+    if len(vips) == 1:
+        return vips[0]
+
+    if not binding:
+        binding = 'access'
+
+    bound_cidr = resolve_network_cidr(
+        binding_address(binding)
+    )
+    for vip in vips:
+        if is_address_in_network(bound_cidr, vip):
+            return vip
+
+    return None
+
+
 def get_access_address():
     protocol = 'http'
     addr = hookenv.config('dns-ha-access-record')
-    addr = addr or hookenv.config('vip')
+    addr = addr or get_vip('access')
     addr = addr or binding_address('access')
     if charms.reactive.is_state('vault.ssl.available'):
         protocol = 'https'

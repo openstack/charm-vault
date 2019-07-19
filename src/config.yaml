@@ -46,7 +46,10 @@ options:
     type: string
     default:
     description: |
-      Virtual IP to use api traffic
+      Virtual IP to use api traffic. You can provide up to two addresses
+      configured on the access or external bindings. If neither binding
+      is used then you can only provide one address that must be configured
+      on the default space.
   channel:
     type: string
     default: stable
