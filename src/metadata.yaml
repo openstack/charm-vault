@@ -14,7 +14,7 @@ description: |
 series:
   - xenial
   - bionic
-  - cosmic
+  - eoan
   - disco
 tags:
   - security
