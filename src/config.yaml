@@ -84,3 +84,19 @@ options:
       Hostname to be used for the API URL. This hostname should exist as a DNS
       record and be resolvable by the charms that will consume the relation 
       with vault.
+  max-ttl:
+    type: string
+    default: '87600h'
+    description: >-
+      Max allowed TTL to use when generating certs (must be greater than the
+      default).
+  default-ca-ttl:
+    type: string
+    default: '87599h'
+    description: >-
+      Default TTL to use when generating CA certs.
+  default-ttl:
+    type: string
+    default: '8759h'
+    description: >-
+      Default TTL to use when generating certs.

@@ -703,17 +703,19 @@ def _assess_status():
 def auto_generate_root_ca_cert():
     actions_yaml = yaml.load(Path('actions.yaml').read_text())
     props = actions_yaml['generate-root-ca']['properties']
+    ttl = config()['default-ca-ttl']
+    max_ttl = config()['max-ttl']
     action_config = {key: value['default'] for key, value in props.items()}
     try:
         root_ca = vault_pki.generate_root_ca(
-            ttl=action_config['ttl'],
             allow_any_name=action_config['allow-any-name'],
             allowed_domains=action_config['allowed-domains'],
             allow_bare_domains=action_config['allow-bare-domains'],
             allow_subdomains=action_config['allow-subdomains'],
             allow_glob_domains=action_config['allow-glob-domains'],
             enforce_hostnames=action_config['enforce-hostnames'],
-            max_ttl=action_config['max-ttl'])
+            ttl=ttl,
+            max_ttl=max_ttl)
         leader_set({'root-ca': root_ca})
         set_flag('charm.vault.ca.ready')
         set_flag('charm.vault.ca.auto-generated')
@@ -756,9 +758,11 @@ def publish_global_client_cert():
     reissue_requested = is_flag_set('certificates.reissue.global.requested')
     tls = endpoint_from_flag('certificates.available')
     if not cert_created or reissue_requested:
+        ttl = config()['default-ttl']
+        max_ttl = config()['max-ttl']
         bundle = vault_pki.generate_certificate('client',
                                                 'global-client',
-                                                [])
+                                                [], ttl, max_ttl)
         unitdata.kv().set('charm.vault.global-client-cert', bundle)
         set_flag('charm.vault.global-client-cert.created')
         clear_flag('certificates.reissue.global.requested')
@@ -782,9 +786,11 @@ def create_certs():
         log('Processing certificate request from {} for {}'.format(
             request.unit_name, request.common_name))
         try:
+            ttl = config()['default-ttl']
+            max_ttl = config()['max-ttl']
             bundle = vault_pki.generate_certificate(request.cert_type,
                                                     request.common_name,
-                                                    request.sans)
+                                                    request.sans, ttl, max_ttl)
             request.set_cert(bundle['certificate'], bundle['private_key'])
         except vault.VaultInvalidRequest as e:
             log(str(e), level=ERROR)
@@ -814,5 +820,18 @@ def post_series_upgrade():
 def tune_pki_backend():
     """Ensure Vault PKI backend is correctly tuned
     """
-    vault_pki.tune_pki_backend()
+    ttl = config()['default-ttl']
+    max_ttl = config()['max-ttl']
+    vault_pki.tune_pki_backend(ttl=ttl, max_ttl=max_ttl)
     set_flag('pki.backend.tuned')
+
+
+@when('leadership.is_leader',
+      'charm.vault.ca.ready')
+@when('config.set.default-ttl')
+@when('config.set.max-ttl')
+def tune_pki_backend_config_changed():
+    ttl = config()['default-ttl']
+    max_ttl = config()['max-ttl']
+    vault_pki.tune_pki_backend(ttl=ttl, max_ttl=max_ttl)
+    vault_pki.update_roles(max_ttl=max_ttl)
