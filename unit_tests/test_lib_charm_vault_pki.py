@@ -22,10 +22,12 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
         vault_pki.configure_pki_backend(
             client_mock,
             'my_backend',
-            ttl=42)
+            ttl=42, max_ttl=42)
         client_mock.enable_secret_backend.assert_called_once_with(
             backend_type='pki',
-            config={'max_lease_ttl': 42},
+            config={
+                'default_lease_ttl': 42,
+                'max_lease_ttl': 42},
             description='Charm created PKI backend',
             mount_point='my_backend')
 
@@ -38,7 +40,9 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
             'my_backend')
         client_mock.enable_secret_backend.assert_called_once_with(
             backend_type='pki',
-            config={'max_lease_ttl': '87600h'},
+            config={
+                'default_lease_ttl': '8759h',
+                'max_lease_ttl': '87600h'},
             description='Charm created PKI backend',
             mount_point='my_backend')
 
@@ -121,13 +125,16 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
         ]
         vault_pki.generate_certificate('server',
                                        'example.com',
-                                       ([], []))
+                                       ([], []),
+                                       ttl='3456h', max_ttl='3456h')
         vault_pki.generate_certificate('server',
                                        'example.com',
-                                       (['ip1'], ['alt1']))
+                                       (['ip1'], ['alt1']),
+                                       ttl='3456h', max_ttl='3456h')
         vault_pki.generate_certificate('client',
                                        'example.com',
-                                       (['ip1', 'ip2'], ['alt1', 'alt2']))
+                                       (['ip1', 'ip2'], ['alt1', 'alt2']),
+                                       ttl='3456h', max_ttl='3456h')
         client_mock.write.assert_has_calls(write_calls)
 
     @patch.object(vault_pki, 'is_ca_ready')
@@ -140,7 +147,8 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
         get_local_client.return_value = client_mock
         is_ca_ready.return_value = False
         with self.assertRaises(vault_pki.vault.VaultNotReady):
-            vault_pki.generate_certificate('server', 'exmaple.com', [])
+            vault_pki.generate_certificate('server', 'exmaple.com', [],
+                                           ttl='3456h', max_ttl='3456h')
 
     @patch.object(vault_pki, 'is_ca_ready')
     @patch.object(vault_pki, 'configure_pki_backend')
@@ -152,7 +160,8 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
         get_local_client.return_value = client_mock
         is_ca_ready.return_value = True
         with self.assertRaises(vault_pki.vault.VaultInvalidRequest):
-            vault_pki.generate_certificate('unknown', 'exmaple.com', [])
+            vault_pki.generate_certificate('unknown', 'exmaple.com', [],
+                                           '3456h', '3456h')
 
     @patch.object(vault_pki, 'is_ca_ready')
     @patch.object(vault_pki, 'configure_pki_backend')
@@ -165,7 +174,8 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
         is_ca_ready.return_value = True
         client_mock.write.side_effect = hvac.exceptions.InvalidRequest
         with self.assertRaises(vault_pki.vault.VaultInvalidRequest):
-            vault_pki.generate_certificate('server', 'exmaple.com', [])
+            vault_pki.generate_certificate('server', 'exmaple.com', [],
+                                           ttl='3456h', max_ttl='3456h')
 
     @patch.object(vault_pki, 'configure_pki_backend')
     @patch.object(vault_pki.vault, 'get_local_client')
@@ -373,11 +383,55 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
         is_backend_mounted.return_value = True
         mock_client = mock.MagicMock()
         get_local_client.return_value = mock_client
-        vault_pki.tune_pki_backend(ttl='3456h')
+        vault_pki.tune_pki_backend(ttl='3456h', max_ttl='3456h')
         is_backend_mounted.assert_called_with(mock_client,
                                               vault_pki.CHARM_PKI_MP)
         mock_client.tune_secret_backend.assert_called_with(
             backend_type='pki',
             mount_point=vault_pki.CHARM_PKI_MP,
-            max_lease_ttl='3456h'
+            max_lease_ttl='3456h',
+            default_lease_ttl='3456h'
         )
+
+    @patch.object(vault_pki.vault, 'get_local_client')
+    def test_update_roles(self, get_local_client):
+        mock_client = mock.MagicMock()
+        get_local_client.return_value = mock_client
+        mock_client.read.return_value = {
+            'data': {
+                'allow_any_name': True,
+                'allowed_domains': 'domains',
+                'allow_bare_domains': True,
+                'allow_subdomains': True,
+                'allow_glob_domains': False,
+                'enforce_hostnames': True,
+                'max_ttl': '10h',
+                'server_flag': True,
+                'client_flag': True,
+            }
+        }
+        vault_pki.update_roles(max_ttl='20h')
+        mock_client.write.assert_has_calls([
+            mock.call('{}/roles/{}'.format(
+                vault_pki.CHARM_PKI_MP, vault_pki.CHARM_PKI_ROLE),
+                allow_any_name=True,
+                allowed_domains='domains',
+                allow_bare_domains=True,
+                allow_subdomains=True,
+                allow_glob_domains=False,
+                enforce_hostnames=True,
+                max_ttl='20h',
+                server_flag=True,
+                client_flag=True),
+            mock.call('{}/roles/{}'.format(
+                vault_pki.CHARM_PKI_MP, vault_pki.CHARM_PKI_ROLE_CLIENT),
+                allow_any_name=True,
+                allowed_domains='domains',
+                allow_bare_domains=True,
+                allow_subdomains=True,
+                allow_glob_domains=False,
+                enforce_hostnames=True,
+                max_ttl='20h',
+                server_flag=False,
+                client_flag=True),
+        ])

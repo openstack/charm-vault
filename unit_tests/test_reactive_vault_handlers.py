@@ -747,7 +747,13 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
 
     @mock.patch.object(handlers, 'vault_pki')
     def test_publish_global_client_cert_reissue(self, vault_pki):
+        self.config.return_value = {
+            'default-ttl': '3456h',
+            'max-ttl': '3456h',
+        }
+
         tls = self.endpoint_from_flag.return_value
+
         self.is_flag_set.side_effect = [True, True]
         bundle = {'certificate': 'crt',
                   'private_key': 'key'}
@@ -755,7 +761,9 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         handlers.publish_global_client_cert()
         vault_pki.generate_certificate.assert_called_with('client',
                                                           'global-client',
-                                                          [])
+                                                          [],
+                                                          '3456h',
+                                                          '3456h')
         self.unitdata.kv().set.assert_called_with('charm.vault.'
                                                   'global-client-cert',
                                                   bundle)
@@ -765,6 +773,11 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
 
     @mock.patch.object(handlers, 'vault_pki')
     def test_publish_global_client_certe(self, vault_pki):
+        self.config.return_value = {
+            'default-ttl': '3456h',
+            'max-ttl': '3456h',
+        }
+
         tls = self.endpoint_from_flag.return_value
         self.is_flag_set.side_effect = [False, False]
         bundle = {'certificate': 'crt',
@@ -773,7 +786,9 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         handlers.publish_global_client_cert()
         vault_pki.generate_certificate.assert_called_with('client',
                                                           'global-client',
-                                                          [])
+                                                          [],
+                                                          '3456h',
+                                                          '3456h')
         self.unitdata.kv().set.assert_called_with('charm.vault.'
                                                   'global-client-cert',
                                                   bundle)
@@ -783,6 +798,11 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
 
     @mock.patch.object(handlers, 'vault_pki')
     def test_create_certs(self, vault_pki):
+        self.config.return_value = {
+            'default-ttl': '3456h',
+            'max-ttl': '3456h',
+        }
+
         tls = self.endpoint_from_flag.return_value
         self.is_flag_set.return_value = False
         tls.new_requests = [mock.Mock(cert_type='cert_type1',
@@ -801,9 +821,12 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         ]
         handlers.create_certs()
         vault_pki.generate_certificate.assert_has_calls([
-            mock.call('cert_type1', 'common_name1', 'sans1'),
-            mock.call('invalid', 'invalid', 'invalid'),
-            mock.call('cert_type2', 'common_name2', 'sans2'),
+            mock.call('cert_type1', 'common_name1', 'sans1',
+                      '3456h', '3456h'),
+            mock.call('invalid', 'invalid', 'invalid',
+                      '3456h', '3456h'),
+            mock.call('cert_type2', 'common_name2', 'sans2',
+                      '3456h', '3456h')
         ])
         tls.new_requests[0].set_cert.assert_has_calls([
             mock.call('crt1', 'key1'),
@@ -815,9 +838,27 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
 
     @mock.patch.object(handlers, 'vault_pki')
     def test_tune_pki_backend(self, vault_pki):
+        self.config.return_value = {
+            'default-ttl': '8759h',
+            'max-ttl': '87600h',
+        }
+
         handlers.tune_pki_backend()
-        vault_pki.tune_pki_backend.assert_called_once_with()
+        vault_pki.tune_pki_backend.assert_called_once_with(max_ttl='87600h',
+                                                           ttl='8759h')
         self.set_flag.assert_called_once_with('pki.backend.tuned')
+
+    @mock.patch.object(handlers, 'vault_pki')
+    def test_tune_pki_backend_config_changed(self, vault_pki):
+        self.config.return_value = {
+            'default-ttl': '8759h',
+            'max-ttl': '87600h',
+        }
+
+        handlers.tune_pki_backend_config_changed()
+        vault_pki.tune_pki_backend.assert_called_once_with(max_ttl='87600h',
+                                                           ttl='8759h')
+        vault_pki.update_roles.assert_called_once_with(max_ttl='87600h')
 
     @mock.patch.object(handlers, 'config')
     @mock.patch.object(handlers, 'clear_flag')
