@@ -8,6 +8,7 @@ gate_bundles:
 - xenial-postgres
 - xenial-mysql
 - bionic-postgres
+- disco-postgres
 smoke_bundles:
 - xenial-mysql
 target_deploy_status:

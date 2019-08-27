@@ -1,0 +1,13 @@
+series: disco
+services:
+  vault:
+    num_units: 1
+    series: disco
+    charm: ../../../vault
+  postgresql:
+    series: xenial
+    charm: cs:postgresql
+    num_units: 1
+relations:
+- - vault:db
+  - postgresql:db
