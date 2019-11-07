@@ -122,3 +122,7 @@ disable-pki:
   description: >-
     Disable the PKI secrets backend.  This is needed if you wish to switch the CA type
     after being set up via either upload-signed-csr or generate-root-ca.
+pause:
+  description: Pause the vault unit.
+resume:
+  descrpition: Resume the vault unit.

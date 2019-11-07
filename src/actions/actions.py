@@ -31,6 +31,7 @@ import charmhelpers.core.unitdata as unitdata
 import charm.vault as vault
 import charm.vault_pki as vault_pki
 import charms.reactive
+import reactive.vault_handlers as handlers  # noqa: E402
 
 from charms.reactive.flags import set_flag, clear_flag
 
@@ -132,6 +133,28 @@ def reissue_certificates(*args):
     set_flag('certificates.reissue.global.requested')
 
 
+def pause(args):
+    """Pauses the Vault service.
+
+    The result of this action will be to have vault daemon
+    stopped. juju will report the unit status as "Blocked, vault
+    service not running".
+
+    """
+    handlers.pause_vault_unit()
+
+
+def resume(args):
+    """Resumes the Vault service.
+
+    The result of this action will be to have vault daemon
+    resumed. User will have to unseal the service. juju will report
+    the unit status as "Blocked, unit is sealed".
+
+    """
+    handlers.resume_vault_unit()
+
+
 # Actions to function mapping, to allow for illegal python action names that
 # can map to a python function.
 ACTIONS = {
@@ -143,6 +166,8 @@ ACTIONS = {
     "generate-root-ca": generate_root_ca,
     "get-root-ca": get_root_ca,
     "disable-pki": disable_pki,
+    "pause": pause,
+    "resume": resume,
 }
 
 

@@ -16,6 +16,8 @@ from charmhelpers.contrib.charmsupport.nrpe import (
 
 from charmhelpers.contrib.openstack.utils import (
     is_unit_paused_set,
+    pause_unit,
+    resume_unit,
 )
 
 from charmhelpers.core.hookenv import (
@@ -855,3 +857,30 @@ def tune_pki_backend_config_changed():
         max_ttl = config()['max-ttl']
         vault_pki.tune_pki_backend(ttl=ttl, max_ttl=max_ttl)
         vault_pki.update_roles(max_ttl=max_ttl)
+
+
+def _action_vault_unit(f):
+    """Helper used to execute actions on the vault unit.
+
+    Note: the service name and port are not expected to change.
+    """
+    f(_assess_status, ["vault"], [8200])
+
+
+def pause_vault_unit():
+    """Pause the vault unit.
+
+    This function is using the 'pause_unit' helper which will also
+    check whether the service is well stopped and port is no longer
+    listening.
+    """
+    _action_vault_unit(pause_unit)
+
+
+def resume_vault_unit():
+    """Resume the vault unit.
+
+    This function is using the 'resume_unit' helper which will also
+    check whether the service is well running and port listening.
+    """
+    _action_vault_unit(resume_unit)
