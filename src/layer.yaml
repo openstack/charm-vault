@@ -16,3 +16,4 @@ options:
     packages:
       - libffi-dev
       - libpq-dev
+repo: https://opendev.org/openstack/charm-vault.git
