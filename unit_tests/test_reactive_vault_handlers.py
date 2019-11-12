@@ -723,14 +723,32 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             vault_ca='test-ca'
         )
 
+    def _set_sealed(self, _vault, status):
+        hvac_client = mock.MagicMock()
+        _vault.get_client.return_value = hvac_client
+        hvac_client.is_sealed.return_value = status
+
+    @mock.patch.object(handlers, 'vault')
     @mock.patch.object(handlers, 'vault_pki')
-    def test_publish_ca_info(self, vault_pki):
+    def test_publish_ca_info(self, vault_pki, _vault):
+        self._set_sealed(_vault, False)
+
         tls = self.endpoint_from_flag.return_value
         vault_pki.get_ca.return_value = 'ca'
         vault_pki.get_chain.return_value = 'chain'
         handlers.publish_ca_info()
         tls.set_ca.assert_called_with('ca')
         tls.set_chain.assert_called_with('chain')
+
+    @mock.patch.object(handlers, 'vault')
+    @mock.patch.object(handlers, 'vault_pki')
+    def test_publish_ca_info_sealed(self, vault_pki, _vault):
+        self._set_sealed(_vault, True)
+
+        tls = self.endpoint_from_flag.return_value
+        handlers.publish_ca_info()
+        assert not tls.set_ca.called
+        assert not tls.set_chain.called
 
     @mock.patch.object(handlers, 'vault_pki')
     def test_publish_global_client_cert_already_gend(self, vault_pki):

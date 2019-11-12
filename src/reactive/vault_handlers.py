@@ -734,11 +734,15 @@ def takeover_cert_leadership():
       'charm.vault.ca.ready',
       'certificates.available')
 def publish_ca_info():
+    client = vault.get_client(url=vault.VAULT_LOCALHOST_URL)
     tls = endpoint_from_flag('certificates.available')
-    tls.set_ca(vault_pki.get_ca())
-    chain = vault_pki.get_chain()
-    if chain:
-        tls.set_chain(chain)
+    if client.is_sealed():
+        log("Unable to publish ca info, service sealed.")
+    else:
+        tls.set_ca(vault_pki.get_ca())
+        chain = vault_pki.get_chain()
+        if chain:
+            tls.set_chain(chain)
 
 
 @when('leadership.is_leader',
