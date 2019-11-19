@@ -53,7 +53,7 @@ upload-signed-csr:
         Specifies if clients can request any CN
     max-ttl:
       type: string
-      default: '87598h'
+      default: '8760h'
       description: >-
         Specifies the maximum Time To Live
     root-ca:
@@ -70,7 +70,7 @@ generate-root-ca:
   properties:
     ttl:
       type: string
-      default: '87598h'
+      default: '87599h'
       description: >-
         Specifies the Time To Live for the root CA certificate
     allow-any-name:
@@ -113,7 +113,7 @@ generate-root-ca:
         for CNs, DNS SANs, and the host part of email addresses.
     max-ttl:
       type: string
-      default: '696h'
+      default: '8760h'
       description: >-
         Specifies the maximum Time To Live for generated certificates.
 get-root-ca:

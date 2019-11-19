@@ -10,7 +10,7 @@ CHARM_PKI_ROLE = "local"
 CHARM_PKI_ROLE_CLIENT = "local-client"
 
 
-def configure_pki_backend(client, name, ttl=None):
+def configure_pki_backend(client, name, ttl=None, max_ttl=None):
     """Ensure a pki backend is enabled
 
     :param client: Vault client
@@ -26,7 +26,9 @@ def configure_pki_backend(client, name, ttl=None):
             description='Charm created PKI backend',
             mount_point=name,
             # Default ttl to 10 years
-            config={'max_lease_ttl': ttl or '87600h'})
+            config={
+                'default_lease_ttl': ttl or '8759h',
+                'max_lease_ttl': max_ttl or '87600h'})
 
 
 def disable_pki_backend():
@@ -42,7 +44,7 @@ def disable_pki_backend():
         client.disable_secret_backend(CHARM_PKI_MP)
 
 
-def tune_pki_backend(ttl=None):
+def tune_pki_backend(ttl=None, max_ttl=None):
     """Assert tuning options for Charm PKI backend
 
     :param ttl: TTL
@@ -53,7 +55,8 @@ def tune_pki_backend(ttl=None):
         client.tune_secret_backend(
             backend_type='pki',
             mount_point=CHARM_PKI_MP,
-            max_lease_ttl=ttl or '87600h')
+            default_lease_ttl=ttl or '8759h',
+            max_lease_ttl=max_ttl or '87600h')
 
 
 def is_ca_ready(client, name, role):
@@ -86,7 +89,7 @@ def get_ca():
     return hookenv.leader_get('root-ca')
 
 
-def generate_certificate(cert_type, common_name, sans):
+def generate_certificate(cert_type, common_name, sans, ttl, max_ttl):
     """
     Create a certificate and key for the given CN and SANs, if requested.
 
@@ -99,7 +102,7 @@ def generate_certificate(cert_type, common_name, sans):
     :rtype: tuple
     """
     client = vault.get_local_client()
-    configure_pki_backend(client, CHARM_PKI_MP)
+    configure_pki_backend(client, CHARM_PKI_MP, ttl, max_ttl)
     if not is_ca_ready(client, CHARM_PKI_MP, CHARM_PKI_ROLE):
         raise vault.VaultNotReady("CA not ready")
     role = None
@@ -208,25 +211,13 @@ def upload_signed_csr(pem, allowed_domains, allow_subdomains=True,
     # Configure a role which maps to a policy for accessing this pki
     if not max_ttl:
         max_ttl = '87598h'
-    client.write(
-        '{}/roles/{}'.format(CHARM_PKI_MP, CHARM_PKI_ROLE),
-        allowed_domains=allowed_domains,
-        allow_subdomains=allow_subdomains,
-        enforce_hostnames=enforce_hostnames,
-        allow_any_name=allow_any_name,
-        max_ttl=max_ttl,
-        server_flag=True,
-        client_flag=True)  # server certs can also be used as client certs
-    # Configure a role for using this PKI to issue server certs
-    client.write(
-        '{}/roles/{}'.format(CHARM_PKI_MP, CHARM_PKI_ROLE_CLIENT),
-        allowed_domains=allowed_domains,
-        allow_subdomains=allow_subdomains,
-        enforce_hostnames=enforce_hostnames,
-        allow_any_name=allow_any_name,
-        max_ttl=max_ttl,
-        server_flag=False,  # client certs cannot be used as server certs
-        client_flag=True)
+    write_roles(client,
+                allow_any_name=allow_any_name,
+                allowed_domains=allowed_domains,
+                allow_subdomains=allow_subdomains,
+                enforce_hostnames=enforce_hostnames,
+                max_ttl=max_ttl,
+                client_flag=True)
 
 
 def generate_root_ca(ttl='87599h', allow_any_name=True, allowed_domains=None,
@@ -284,30 +275,16 @@ def generate_root_ca(ttl='87599h', allow_any_name=True, allowed_domains=None,
         issuing_certificates="{}/v1/{}/ca".format(addr, CHARM_PKI_MP),
         crl_distribution_points="{}/v1/{}/crl".format(addr, CHARM_PKI_MP)
     )
-    # Configure a role for using this PKI to issue server certs
-    client.write(
-        '{}/roles/{}'.format(CHARM_PKI_MP, CHARM_PKI_ROLE),
-        allow_any_name=allow_any_name,
-        allowed_domains=allowed_domains,
-        allow_bare_domains=allow_bare_domains,
-        allow_subdomains=allow_subdomains,
-        allow_glob_domains=allow_glob_domains,
-        enforce_hostnames=enforce_hostnames,
-        max_ttl=max_ttl,
-        server_flag=True,
-        client_flag=True)  # server certs can also be used as client certs
-    # Configure a role for using this PKI to issue client-only certs
-    client.write(
-        '{}/roles/{}'.format(CHARM_PKI_MP, CHARM_PKI_ROLE_CLIENT),
-        allow_any_name=allow_any_name,
-        allowed_domains=allowed_domains,
-        allow_bare_domains=allow_bare_domains,
-        allow_subdomains=allow_subdomains,
-        allow_glob_domains=allow_glob_domains,
-        enforce_hostnames=enforce_hostnames,
-        max_ttl=max_ttl,
-        server_flag=False,  # client certs cannot be used as server certs
-        client_flag=True)
+
+    write_roles(client,
+                allow_any_name=allow_any_name,
+                allowed_domains=allowed_domains,
+                allow_bare_domains=allow_bare_domains,
+                allow_subdomains=allow_subdomains,
+                allow_glob_domains=allow_glob_domains,
+                enforce_hostnames=enforce_hostnames,
+                max_ttl=max_ttl,
+                client_flag=True)
     return cert
 
 
@@ -323,3 +300,33 @@ def sort_sans(sans):
     ip_sans = {s for s in sans if ch_ip.is_ip(s)}
     alt_names = set(sans).difference(ip_sans)
     return sorted(list(ip_sans)), sorted(list(alt_names))
+
+
+def write_roles(client, **kwargs):
+    # Configure a role for using this PKI to issue server certs
+    client.write(
+        '{}/roles/{}'.format(CHARM_PKI_MP, CHARM_PKI_ROLE),
+        server_flag=True,
+        **kwargs)
+    # Configure a role for using this PKI to issue client-only certs
+    client.write(
+        '{}/roles/{}'.format(CHARM_PKI_MP, CHARM_PKI_ROLE_CLIENT),
+        server_flag=False,  # client certs cannot be used as server certs
+        **kwargs)
+
+
+def update_roles(**kwargs):
+    client = vault.get_local_client()
+    # local and local-client contain the same data except for server_flag,
+    # so we only need to read one, but update both
+    local = client.read(
+        '{}/roles/{}'.format(CHARM_PKI_MP, CHARM_PKI_ROLE))['data']
+    # the reason we handle as kwargs here is because updating n-1 fields
+    # causes all the others to reset. Therefore we always need to read what
+    # the current values of all fields are, and apply all of them as well
+    # so they are not reset. In case of new fields are added in the future,
+    # this code makes sure that they are not reset automatically (if set
+    # somewhere else in code) when this function is invoked.
+    local.update(**kwargs)
+    del local['server_flag']
+    write_roles(client, **local)
