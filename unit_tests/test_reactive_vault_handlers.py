@@ -875,8 +875,11 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
                                                            ttl='8759h')
         self.set_flag.assert_called_once_with('pki.backend.tuned')
 
+    @mock.patch.object(handlers, 'vault')
     @mock.patch.object(handlers, 'vault_pki')
-    def test_tune_pki_backend_config_changed(self, vault_pki):
+    def test_tune_pki_backend_config_changed(self, vault_pki, _vault):
+        self.is_unit_paused_set.return_value = False
+        self._set_sealed(_vault, False)
         self.config.return_value = {
             'default-ttl': '8759h',
             'max-ttl': '87600h',
@@ -886,6 +889,28 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         vault_pki.tune_pki_backend.assert_called_once_with(max_ttl='87600h',
                                                            ttl='8759h')
         vault_pki.update_roles.assert_called_once_with(max_ttl='87600h')
+
+    @mock.patch.object(handlers, 'vault')
+    @mock.patch.object(handlers, 'vault_pki')
+    def test_tune_pki_backend_config_changed_sealed(self, vault_pki, _vault):
+        self.is_unit_paused_set.return_value = False
+        self._set_sealed(_vault, True)
+        self.config.return_value = {
+            'default-ttl': '8759h',
+            'max-ttl': '87600h',
+        }
+
+        handlers.tune_pki_backend_config_changed()
+        assert not vault_pki.tune_pki_backend.called
+        assert not vault_pki.update_roles.called
+
+    @mock.patch.object(handlers, 'vault_pki')
+    def test_tune_pki_backend_config_changed_paused(self, vault_pki):
+        self.is_unit_paused_set.return_value = True
+
+        handlers.tune_pki_backend_config_changed()
+        assert not vault_pki.tune_pki_backend.called
+        assert not vault_pki.update_roles.called
 
     @mock.patch.object(handlers, 'config')
     @mock.patch.object(handlers, 'clear_flag')

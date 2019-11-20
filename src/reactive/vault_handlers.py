@@ -843,7 +843,15 @@ def tune_pki_backend():
 @when('config.set.default-ttl')
 @when('config.set.max-ttl')
 def tune_pki_backend_config_changed():
-    ttl = config()['default-ttl']
-    max_ttl = config()['max-ttl']
-    vault_pki.tune_pki_backend(ttl=ttl, max_ttl=max_ttl)
-    vault_pki.update_roles(max_ttl=max_ttl)
+    if is_unit_paused_set():
+        log("The Vault unit is paused, passing on tunning pki backend.")
+        return
+    # TODO(sahid): Add check when service is not running
+    client = vault.get_client(url=vault.VAULT_LOCALHOST_URL)
+    if client.is_sealed():
+        log("Unable to tune pki backend, service sealed.")
+    else:
+        ttl = config()['default-ttl']
+        max_ttl = config()['max-ttl']
+        vault_pki.tune_pki_backend(ttl=ttl, max_ttl=max_ttl)
+        vault_pki.update_roles(max_ttl=max_ttl)
