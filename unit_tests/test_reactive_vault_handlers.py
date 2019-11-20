@@ -71,6 +71,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             'clear_flag',
             'is_container',
             'unitdata',
+            'is_unit_paused_set',
         ]
         self.patch_all()
         self.is_container.return_value = False
@@ -731,6 +732,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
     @mock.patch.object(handlers, 'vault')
     @mock.patch.object(handlers, 'vault_pki')
     def test_publish_ca_info(self, vault_pki, _vault):
+        self.is_unit_paused_set.return_value = False
         self._set_sealed(_vault, False)
 
         tls = self.endpoint_from_flag.return_value
@@ -743,12 +745,19 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
     @mock.patch.object(handlers, 'vault')
     @mock.patch.object(handlers, 'vault_pki')
     def test_publish_ca_info_sealed(self, vault_pki, _vault):
+        self.is_unit_paused_set.return_value = False
         self._set_sealed(_vault, True)
 
         tls = self.endpoint_from_flag.return_value
         handlers.publish_ca_info()
         assert not tls.set_ca.called
         assert not tls.set_chain.called
+
+    @mock.patch.object(handlers, 'vault')
+    def test_publish_ca_info_paused(self, _vault):
+        self.is_unit_paused_set.return_value = True
+        handlers.publish_ca_info()
+        assert not _vault.get_client.called
 
     @mock.patch.object(handlers, 'vault_pki')
     def test_publish_global_client_cert_already_gend(self, vault_pki):

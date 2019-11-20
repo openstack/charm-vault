@@ -14,6 +14,10 @@ from charmhelpers.contrib.charmsupport.nrpe import (
     get_nagios_unit_name,
 )
 
+from charmhelpers.contrib.openstack.utils import (
+    is_unit_paused_set,
+)
+
 from charmhelpers.core.hookenv import (
     DEBUG,
     ERROR,
@@ -736,6 +740,10 @@ def takeover_cert_leadership():
       'charm.vault.ca.ready',
       'certificates.available')
 def publish_ca_info():
+    if is_unit_paused_set():
+        log("The Vault unit is paused, passing on publishing ca info.")
+        return
+    # TODO(sahid): Add check when service is not running
     client = vault.get_client(url=vault.VAULT_LOCALHOST_URL)
     tls = endpoint_from_flag('certificates.available')
     if client.is_sealed():
