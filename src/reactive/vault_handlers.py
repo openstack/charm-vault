@@ -745,7 +745,9 @@ def publish_ca_info():
     if is_unit_paused_set():
         log("The Vault unit is paused, passing on publishing ca info.")
         return
-    # TODO(sahid): Add check when service is not running
+    if not service_running('vault'):
+        set_flag('failed.to.start')
+        return
     client = vault.get_client(url=vault.VAULT_LOCALHOST_URL)
     tls = endpoint_from_flag('certificates.available')
     if client.is_sealed():
@@ -848,7 +850,9 @@ def tune_pki_backend_config_changed():
     if is_unit_paused_set():
         log("The Vault unit is paused, passing on tunning pki backend.")
         return
-    # TODO(sahid): Add check when service is not running
+    if not service_running('vault'):
+        set_flag('failed.to.start')
+        return
     client = vault.get_client(url=vault.VAULT_LOCALHOST_URL)
     if client.is_sealed():
         log("Unable to tune pki backend, service sealed.")

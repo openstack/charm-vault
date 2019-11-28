@@ -733,6 +733,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
     @mock.patch.object(handlers, 'vault_pki')
     def test_publish_ca_info(self, vault_pki, _vault):
         self.is_unit_paused_set.return_value = False
+        self.service_running.return_value = True
         self._set_sealed(_vault, False)
 
         tls = self.endpoint_from_flag.return_value
@@ -746,6 +747,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
     @mock.patch.object(handlers, 'vault_pki')
     def test_publish_ca_info_sealed(self, vault_pki, _vault):
         self.is_unit_paused_set.return_value = False
+        self.service_running.return_value = True
         self._set_sealed(_vault, True)
 
         tls = self.endpoint_from_flag.return_value
@@ -757,6 +759,15 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
     def test_publish_ca_info_paused(self, _vault):
         self.is_unit_paused_set.return_value = True
         handlers.publish_ca_info()
+        assert not _vault.get_client.called
+
+    @mock.patch.object(handlers, 'vault')
+    def test_publish_ca_info_service_notrunning(self, _vault):
+        self.is_unit_paused_set.return_value = False
+        self.service_running.return_value = False
+
+        handlers.publish_ca_info()
+        self.set_flag.assert_called_with('failed.to.start')
         assert not _vault.get_client.called
 
     @mock.patch.object(handlers, 'vault_pki')
@@ -909,6 +920,16 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         self.is_unit_paused_set.return_value = True
 
         handlers.tune_pki_backend_config_changed()
+        assert not vault_pki.tune_pki_backend.called
+        assert not vault_pki.update_roles.called
+
+    @mock.patch.object(handlers, 'vault_pki')
+    def test_tune_pki_backend_config_changed_notrunning(self, vault_pki):
+        self.is_unit_paused_set.return_value = False
+        self.service_running.return_value = False
+
+        handlers.tune_pki_backend_config_changed()
+        self.set_flag.assert_called_with('failed.to.start')
         assert not vault_pki.tune_pki_backend.called
         assert not vault_pki.update_roles.called
 
