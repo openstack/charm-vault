@@ -17,6 +17,7 @@ storage "mysql" {
   password = "{{ mysql_db_relation.password() }}"
   database = "{{ mysql_db_relation.database() }}"
   address = "{{ mysql_db_relation.db_host() }}:3306"
+  max_connection_lifetime = "3600"
 }
 {%- endif %}
 {%- if etcd_conn %}
