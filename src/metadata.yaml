@@ -15,7 +15,6 @@ series:
   - xenial
   - bionic
   - eoan
-  - disco
 tags:
   - security
 extra-bindings:
