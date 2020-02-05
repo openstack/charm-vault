@@ -707,7 +707,7 @@ def _assess_status():
 @when_not('charm.vault.ca.ready',
           'charm.vault.ca.auto-generated')
 def auto_generate_root_ca_cert():
-    actions_yaml = yaml.load(Path('actions.yaml').read_text())
+    actions_yaml = yaml.safe_load(Path('actions.yaml').read_text())
     props = actions_yaml['generate-root-ca']['properties']
     ttl = config()['default-ca-ttl']
     max_ttl = config()['max-ttl']
