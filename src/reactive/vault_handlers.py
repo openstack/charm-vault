@@ -702,6 +702,7 @@ def _assess_status():
     )
 
 
+@when_any('db.master.available', 'shared-db.available')
 @when('leadership.is_leader',
       'config.set.auto-generate-root-ca-cert')
 @when_not('charm.vault.ca.ready',
@@ -738,6 +739,7 @@ def takeover_cert_leadership():
     set_flag('charm.vault.ca.ready')
 
 
+@when_any('db.master.available', 'shared-db.available')
 @when('leadership.is_leader',
       'charm.vault.ca.ready',
       'certificates.available')
@@ -759,6 +761,7 @@ def publish_ca_info():
             tls.set_chain(chain)
 
 
+@when_any('db.master.available', 'shared-db.available')
 @when('leadership.is_leader',
       'charm.vault.ca.ready',
       'certificates.available')
@@ -842,6 +845,7 @@ def tune_pki_backend():
     set_flag('pki.backend.tuned')
 
 
+@when_any('db.master.available', 'shared-db.available')
 @when('leadership.is_leader',
       'charm.vault.ca.ready')
 @when('config.set.default-ttl')
