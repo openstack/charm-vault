@@ -5,4 +5,6 @@
 #
 # Build requirements
 charm-tools>=2.4.4
+# importlib-resources 1.1.0 removed Python 3.5 support
+importlib-resources<1.1.0
 simplejson
