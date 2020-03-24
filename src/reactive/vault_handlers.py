@@ -801,13 +801,25 @@ def create_certs():
     requests = tls.all_requests if reissue_requested else tls.new_requests
     if reissue_requested:
         log('Reissuing all certs')
+    processed_applications = []
     for request in requests:
         log('Processing certificate request from {} for {}'.format(
             request.unit_name, request.common_name))
+        if request.cert_type == 'application':
+            cert_type = 'server'
+            # When an application cert is published all units recieve the same
+            # data so one need to process one request per application.
+            if request.application_name in processed_applications:
+                log('Already done {}'.format(request.application_name))
+                continue
+            else:
+                processed_applications.append(request.application_name)
+        else:
+            cert_type = request.cert_type
         try:
             ttl = config()['default-ttl']
             max_ttl = config()['max-ttl']
-            bundle = vault_pki.generate_certificate(request.cert_type,
+            bundle = vault_pki.generate_certificate(cert_type,
                                                     request.common_name,
                                                     request.sans, ttl, max_ttl)
             request.set_cert(bundle['certificate'], bundle['private_key'])
