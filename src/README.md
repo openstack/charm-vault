@@ -16,7 +16,7 @@ does not support PostgreSQL 10, so neither does this charm. If you're
 deploying on bionic, you'll need to deploy a 9.x version of PostgreSQL.
 
 After deploying and relating the charm to postgresql, install
-the vault snap locally and use "vault init" to create the
+the vault snap locally and use `vault operator init` to create the
 master key shards and the root token, and store them safely.
 
 ## Network Spaces support
