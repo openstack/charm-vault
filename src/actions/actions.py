@@ -44,6 +44,7 @@ def authorize_charm_action(*args):
     action_config = hookenv.action_get()
     role_id = vault.setup_charm_vault_access(action_config['token'])
     hookenv.leader_set({vault.CHARM_ACCESS_ROLE_ID: role_id})
+    set_flag('secrets.refresh')
 
 
 def refresh_secrets(*args):

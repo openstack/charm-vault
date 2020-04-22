@@ -407,7 +407,8 @@ def start_vault():
         set_flag('failed.to.start')
 
 
-@when('leadership.is_leader')
+@when('leadership.is_leader',
+      'secrets.connected')
 @when_any('endpoint.secrets.new-request', 'secrets.refresh')
 def configure_secrets_backend():
     """ Process requests for setup and access to simple kv secret backends """
