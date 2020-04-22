@@ -8,9 +8,10 @@ gate_bundles:
 - xenial-postgres
 - xenial-mysql
 - bionic-postgres
+- bionic-mysql
 - focal-mysql8
 smoke_bundles:
-- xenial-mysql
+- bionic-mysql
 target_deploy_status:
   easyrsa:
     workload-status-message: Certificate Authority connected.
