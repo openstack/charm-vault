@@ -506,17 +506,21 @@ def configure_secrets_backend():
 def send_vault_url_and_ca():
     secrets = endpoint_from_flag('secrets.connected')
     vault_url_external = None
+    hostname = config('hostname')
+    vip = vault.get_vip()
     if is_flag_set('ha.available'):
-        hostname = config('hostname')
         if hostname:
             vault_url = vault.get_api_url(address=hostname)
         else:
-            vip = vault.get_vip()
             vault_url = vault.get_api_url(address=vip)
             ext_vip = vault.get_vip(binding='external')
             if ext_vip and ext_vip != vip:
                 vault_url_external = vault.get_api_url(address=ext_vip,
                                                        binding='external')
+    elif vip:
+        log("VIP is set but ha.available is not yet set, skipping "
+            "send_vault_url_and_ca.", level=DEBUG)
+        return
     else:
         vault_url = vault.get_api_url()
         vault_url_external = vault.get_api_url(binding='external')

@@ -607,12 +607,15 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             mock.call('secrets.refresh'),
         ])
 
+    @mock.patch.object(handlers.vault.hookenv, 'config')
     @mock.patch.object(handlers.vault.hookenv, 'network_get_primary_address')
-    def test_send_vault_url_and_ca(self, mock_network_get_primary_address):
+    def test_send_vault_url_and_ca(
+            self, mock_network_get_primary_address, mock_config):
         _test_config = {
             'ssl-ca': 'test-ca',
         }
         self.config.side_effect = lambda key: _test_config.get(key)
+        mock_config.side_effect = lambda key: _test_config.get(key)
         mock_secrets = mock.MagicMock()
 
         def fake_network_get(binding=None):
@@ -632,12 +635,15 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             vault_ca='test-ca'
         )
 
+    @mock.patch.object(handlers.vault.hookenv, 'config')
     @mock.patch.object(handlers.vault.hookenv, 'network_get_primary_address')
-    def test_send_vault_url_and_ca_ext(self, mock_network_get_primary_address):
+    def test_send_vault_url_and_ca_ext(
+            self, mock_network_get_primary_address, mock_config):
         _test_config = {
             'ssl-ca': 'test-ca',
         }
         self.config.side_effect = lambda key: _test_config.get(key)
+        mock_config.side_effect = lambda key: _test_config.get(key)
         mock_secrets = mock.MagicMock()
 
         def fake_network_get(binding=None):
@@ -703,12 +709,48 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             vault_ca='test-ca'
         )
 
-    def test_send_vault_url_and_ca_hostname(self):
+    @mock.patch('charmhelpers.contrib.network.ip.get_netmask_for_address')
+    @mock.patch.object(handlers.vault.hookenv, 'config')
+    @mock.patch.object(handlers.vault.hookenv, 'network_get_primary_address')
+    def test_send_vault_url_and_ca_ha_not_ready(
+            self, mock_network_get_primary_address, mock_config,
+            mock_get_netmask_for_address):
+        _test_config = {
+            'vip': '10.5.100.1 10.6.100.1',
+            'ssl-ca': 'test-ca',
+            'hostname': None
+        }
+        mock_get_netmask_for_address.return_value = 16
+        self.config.side_effect = lambda key: _test_config.get(key)
+        mock_config.side_effect = lambda key: _test_config.get(key)
+
+        mock_secrets = mock.MagicMock()
+
+        def fake_network_get(binding=None):
+            if binding == 'external':
+                return '10.6.0.23'
+
+            return '10.5.0.23'
+
+        mock_network_get_primary_address.side_effect = fake_network_get
+
+        self.endpoint_from_flag.return_value = mock_secrets
+        # ha.available is not yet set
+        self.is_flag_set.return_value = False
+        handlers.send_vault_url_and_ca()
+        self.endpoint_from_flag.assert_called_with('secrets.connected')
+        self.is_flag_set.assert_called_with('ha.available')
+        mock_secrets.publish_url.assert_not_called()
+        mock_secrets.publish_ca.assert_not_called()
+
+    @mock.patch.object(handlers.vault.hookenv, 'config')
+    def test_send_vault_url_and_ca_hostname(self, mock_config):
         _test_config = {
             'ssl-ca': 'test-ca',
             'hostname': 'vault',
         }
         self.config.side_effect = lambda key: _test_config.get(key)
+        mock_config.side_effect = lambda key: _test_config.get(key)
 
         mock_secrets = mock.MagicMock()
 
