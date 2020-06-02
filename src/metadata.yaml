@@ -1,6 +1,6 @@
 name: vault
 maintainers:
-  - Paul Collins <paul.collins@canonical.com>
+- Paul Collins <paul.collins@canonical.com>
 summary: a tool for managing secrets
 description: |
   Vault secures, stores, and tightly controls access to
@@ -12,12 +12,13 @@ description: |
   credentials, SQL/NoSQL databases, X.509 certificates,
   SSH credentials, and more.
 series:
-  - xenial
-  - bionic
-  - eoan
-  - focal
+- xenial
+- bionic
+- eoan
+- focal
+- groovy
 tags:
-  - security
+- security
 extra-bindings:
   access:
   external:
