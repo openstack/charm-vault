@@ -1,6 +1,6 @@
 name: vault
 maintainers:
-- Paul Collins <paul.collins@canonical.com>
+- OpenStack Charmers <openstack-discuss@lists.openstack.org>
 summary: a tool for managing secrets
 description: |
   Vault secures, stores, and tightly controls access to
