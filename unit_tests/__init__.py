@@ -1,6 +1,6 @@
 # unit tests
 
-import mock
+from unittest import mock
 import sys
 
 sys.path.append('src')
