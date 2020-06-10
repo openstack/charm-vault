@@ -29,6 +29,14 @@ get-csr:
       type: string
       description: >-
         The OU (OrganizationalUnit) values in the subject field of the CSR.
+    common-name:
+      type: string
+      description: >-
+        The CN (Common Name) values in the subject field of the CSR.
+    locality:
+      type: string
+      description: >-
+        The L (Locality) values in the subject field of the CSR.
 upload-signed-csr:
   description: Upload a signed csr to vault
   properties:

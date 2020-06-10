@@ -204,6 +204,7 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
             vault_pki.get_csr(
                 ttl='2h',
                 country='GB',
+                locality='here',
                 province='Kent',
                 organizational_unit='My Department',
                 organization='My Company'),
@@ -213,6 +214,7 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
             common_name=('Vault Intermediate Certificate Authority '
                          '(charm-pki-local)'),
             country='GB',
+            locality='here',
             organization='My Company',
             ou='My Department',
             province='Kent',

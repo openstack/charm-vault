@@ -132,7 +132,8 @@ def generate_certificate(cert_type, common_name, sans, ttl, max_ttl):
     return response['data']
 
 
-def get_csr(ttl=None, country=None, province=None,
+def get_csr(ttl=None, common_name=None, locality=None,
+            country=None, province=None,
             organization=None, organizational_unit=None):
     """Generate a csr for the vault Intermediate Authority
 
@@ -151,20 +152,26 @@ def get_csr(ttl=None, country=None, province=None,
     :param organizational_unit: The OU (OrganizationalUnit) values in the
                                 subject field of the CSR.
     :type organizational_unit: string
+    :param common_name: The CN (Common_Name) values in the
+                                subject field of the CSR.
+    :param locality: The L (Locality) values in the
+                                subject field of the CSR.
     :returns: Certificate signing request
     :rtype: string
     """
     client = vault.get_local_client()
     configure_pki_backend(client, CHARM_PKI_MP)
     config = {
-        'common_name': ("Vault Intermediate Certificate Authority "
-                        "({})".format(CHARM_PKI_MP)),
         #  Year - 1 hour
         'ttl': ttl or '87599h',
         'country': country,
         'province': province,
         'ou': organizational_unit,
-        'organization': organization}
+        'organization': organization,
+        'common_name': common_name or ("Vault Intermediate Certificate "
+                                       "Authority " "({})".format(CHARM_PKI_MP)
+                                       ),
+        'locality': locality}
     config = {k: v for k, v in config.items() if v}
     csr_info = client.write(
         '{}/intermediate/generate/internal'.format(CHARM_PKI_MP),

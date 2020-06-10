@@ -62,6 +62,8 @@ def get_intermediate_csrs(*args):
     csrs = vault_pki.get_csr(
         ttl=action_config.get('ttl'),
         country=action_config.get('country'),
+        common_name=action_config.get('common-name'),
+        locality=action_config.get('locality'),
         province=action_config.get('province'),
         organization=action_config.get('organization'),
         organizational_unit=action_config.get('organizational-unit'))
