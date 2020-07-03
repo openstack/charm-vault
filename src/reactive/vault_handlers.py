@@ -680,11 +680,7 @@ def _assess_status():
         application_version_set(health.get('version'))
     else:
         application_version_set('Unknown')
-        status_set('blocked', 'Vault health check failed')
-        return
-
-    if not service_running('vault'):
-        status_set('blocked', 'Vault service not running')
+        status_set('blocked', 'Unknown vault version')
         return
 
     if not health['initialized']:
@@ -693,6 +689,10 @@ def _assess_status():
 
     if health['sealed']:
         status_set('blocked', 'Unit is sealed')
+        return
+
+    if not client_approle_authorized():
+        status_set('blocked', 'Vault cannot authorize approle')
         return
 
     mlock_disabled = is_container() or config('disable-mlock')
@@ -705,6 +705,19 @@ def _assess_status():
             'disabled' if mlock_disabled else 'enabled'
         )
     )
+
+
+def client_approle_authorized():
+    try:
+        vault.get_local_client()
+        return True
+    except (vault.hvac.exceptions.InternalServerError,
+            vault.VaultNotReady):
+        log("InternalServerError: Unable to athorize approle. "
+            "This may indicate failure to communicate with the database ",
+            "WARNING")
+        log(traceback.format_exc(), level=ERROR)
+        return False
 
 
 @when_any('db.master.available', 'shared-db.available')
@@ -749,6 +762,9 @@ def takeover_cert_leadership():
       'charm.vault.ca.ready',
       'certificates.available')
 def publish_ca_info():
+    if not client_approle_authorized():
+        log("Vault not authorized: Skipping publicsh_ca_info", "WARNING")
+        return
     if is_unit_paused_set():
         log("The Vault unit is paused, passing on publishing ca info.")
         return
@@ -778,6 +794,10 @@ def publish_global_client_cert():
     (though some, like etcd, only block on the flag that it triggers but don't
     actually use the cert), so we have to set it for now.
     """
+    if not client_approle_authorized():
+        log("Vault not authorized: Skipping publish_global_client_cert",
+            "WARNING")
+        return
     cert_created = is_flag_set('charm.vault.global-client-cert.created')
     reissue_requested = is_flag_set('certificates.reissue.global.requested')
     tls = endpoint_from_flag('certificates.available')
@@ -868,6 +888,10 @@ def tune_pki_backend():
 @when('config.set.default-ttl')
 @when('config.set.max-ttl')
 def tune_pki_backend_config_changed():
+    if not client_approle_authorized():
+        log("Vault not authorized: Skipping tune_pki_backend_config_changed",
+            "WARNING")
+        return
     if is_unit_paused_set():
         log("The Vault unit is paused, passing on tunning pki backend.")
         return

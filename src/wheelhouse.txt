@@ -5,5 +5,4 @@ pbr
 psycopg2
 requests
 
-jinja2
 psutil
