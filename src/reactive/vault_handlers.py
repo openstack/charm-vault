@@ -225,6 +225,11 @@ def configure_vault_mysql(mysql):
         'storage_name': 'mysql',
         'mysql_db_relation': mysql,
     }
+    if mysql.ssl_ca():
+        _db_tls_ca_file = "/var/snap/vault/common/db-tls-ca.pem"
+        _db_tls_ca = base64.decodebytes(mysql.ssl_ca().encode())
+        write_file(_db_tls_ca_file, _db_tls_ca, perms=0o600)
+        context["tls_ca_file"] = _db_tls_ca_file
     configure_vault(context)
 
 

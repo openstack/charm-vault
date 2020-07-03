@@ -180,12 +180,35 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
     @patch.object(handlers, 'configure_vault')
     def test_configure_vault_msql(self, configure_vault):
         mysql = mock.MagicMock()
+        mysql.ssl_ca.return_value = None
         mysql.allowed_units.return_value = ['vault/0']
         self.local_unit.return_value = 'vault/0'
         handlers.configure_vault_mysql(mysql)
         configure_vault.assert_called_once_with({
             'storage_name': 'mysql',
             'mysql_db_relation': mysql})
+
+    @patch.object(handlers, 'base64')
+    @patch.object(handlers, 'write_file')
+    @patch.object(handlers, 'configure_vault')
+    def test_configure_vault_msql_tls(
+            self, configure_vault, write_file, base64):
+        _cert = "Certificate Authority"
+        mysql = mock.MagicMock()
+        mysql.ssl_ca.return_value = _cert
+        mysql.allowed_units.return_value = ['vault/0']
+        self.local_unit.return_value = 'vault/0'
+        _base64encoded = "Base64 Encoded"
+        base64.decodebytes.return_value = _base64encoded
+        handlers.configure_vault_mysql(mysql)
+        write_file.assert_called_once_with(
+            "/var/snap/vault/common/db-tls-ca.pem",
+            _base64encoded,
+            perms=0o600)
+        configure_vault.assert_called_once_with({
+            'storage_name': 'mysql',
+            'mysql_db_relation': mysql,
+            'tls_ca_file': '/var/snap/vault/common/db-tls-ca.pem'})
 
     @patch.object(handlers, 'configure_vault')
     def test_configure_vault_msql_noacl(self, configure_vault):
