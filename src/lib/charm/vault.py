@@ -234,6 +234,9 @@ def get_client(url=None):
     return hvac.Client(url=url or get_api_url())
 
 
+@tenacity.retry(wait=tenacity.wait_exponential(multiplier=1, max=60),
+                stop=tenacity.stop_after_attempt(10),
+                reraise=True)
 def get_local_client():
     """Provide a client for talking to the vault api
 
