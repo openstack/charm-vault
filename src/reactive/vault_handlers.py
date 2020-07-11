@@ -469,7 +469,7 @@ def configure_secrets_backend():
         hostname = request['hostname']
         access_address = request['ingress_address']
         isolated = request['isolated']
-        unit_name = unit.unit_name.replace('/', '-')
+        unit_name = request.get('unit_name', unit.unit_name).replace('/', '-')
         policy_name = approle_name = 'charm-{}'.format(unit_name)
 
         if isolated:
