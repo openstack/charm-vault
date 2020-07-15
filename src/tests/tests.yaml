@@ -3,6 +3,7 @@ configure:
 - zaza.openstack.charm_tests.vault.setup.basic_setup
 dev_bundles:
 - bionic
+- groovy-mysql8
 gate_bundles:
 - xenial-ha-mysql
 - xenial-postgres
@@ -32,4 +33,4 @@ tests:
 - zaza.openstack.charm_tests.vault.tests.VaultTest
 tests_options:
   force_deploy:
-    - focal-mysql8
+    - groovy-mysql8
