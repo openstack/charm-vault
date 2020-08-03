@@ -33,6 +33,7 @@ from charmhelpers.core.hookenv import (
     atexit,
     local_unit,
     leader_set,
+    leader_get,
 )
 
 from charmhelpers.core.host import (
@@ -696,6 +697,12 @@ def _assess_status():
         status_set('blocked', 'Unit is sealed')
         return
 
+    if not leader_get(vault.CHARM_ACCESS_ROLE_ID):
+        status_set(
+            'blocked',
+            'Vault charm not yet authorized: run authorize-charm action.')
+        return
+
     if not client_approle_authorized():
         status_set('blocked', 'Vault cannot authorize approle')
         return
@@ -713,6 +720,9 @@ def _assess_status():
 
 
 def client_approle_authorized():
+    if not leader_get(vault.CHARM_ACCESS_ROLE_ID):
+        log("Charm not yet authorized", "DEBUG")
+        return False
     try:
         vault.get_local_client()
         return True

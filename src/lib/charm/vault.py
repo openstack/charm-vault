@@ -235,7 +235,7 @@ def get_client(url=None):
 
 
 @tenacity.retry(wait=tenacity.wait_exponential(multiplier=1, max=60),
-                stop=tenacity.stop_after_attempt(10),
+                stop=tenacity.stop_after_attempt(8),
                 reraise=True)
 def get_local_client():
     """Provide a client for talking to the vault api

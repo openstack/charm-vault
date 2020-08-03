@@ -316,15 +316,18 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         self.is_flag_set.assert_called_with('etcd.tls.available')
         self.config.assert_called_with('disable-mlock')
 
+    @patch.object(handlers, 'leader_get')
     @patch.object(handlers, 'client_approle_authorized')
     @patch.object(handlers, '_assess_interface_groups')
     @patch.object(handlers.vault, 'get_vault_health')
     def test_assess_status(self, get_vault_health,
                            _assess_interface_groups,
-                           _client_approle_authorized):
+                           _client_approle_authorized,
+                           _leader_get):
         self.is_flag_set.return_value = False
         get_vault_health.return_value = self._health_response
         _assess_interface_groups.return_value = []
+        _leader_get.return_value = True
         _client_approle_authorized.return_value = True
         self.config.return_value = False
         self.service_running.return_value = True
@@ -797,12 +800,15 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         _vault.get_client.return_value = hvac_client
         hvac_client.is_sealed.return_value = status
 
+    @mock.patch.object(handlers, 'client_approle_authorized')
     @mock.patch.object(handlers, 'vault')
     @mock.patch.object(handlers, 'vault_pki')
-    def test_publish_ca_info(self, vault_pki, _vault):
+    def test_publish_ca_info(
+            self, vault_pki, _vault, _client_approle_authorized):
         self.is_unit_paused_set.return_value = False
         self.service_running.return_value = True
         self._set_sealed(_vault, False)
+        _client_approle_authorized.return_value = True
 
         tls = self.endpoint_from_flag.return_value
         vault_pki.get_ca.return_value = 'ca'
@@ -811,9 +817,11 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         tls.set_ca.assert_called_with('ca')
         tls.set_chain.assert_called_with('chain')
 
+    @mock.patch.object(handlers, 'client_approle_authorized')
     @mock.patch.object(handlers, 'vault')
     @mock.patch.object(handlers, 'vault_pki')
-    def test_publish_ca_info_sealed(self, vault_pki, _vault):
+    def test_publish_ca_info_sealed(
+            self, vault_pki, _vault, _client_approle_authorized):
         self.is_unit_paused_set.return_value = False
         self.service_running.return_value = True
         self._set_sealed(_vault, True)
@@ -823,16 +831,21 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         assert not tls.set_ca.called
         assert not tls.set_chain.called
 
+    @mock.patch.object(handlers, 'client_approle_authorized')
     @mock.patch.object(handlers, 'vault')
-    def test_publish_ca_info_paused(self, _vault):
+    def test_publish_ca_info_paused(self, _vault, _client_approle_authorized):
         self.is_unit_paused_set.return_value = True
+        _client_approle_authorized.return_value = True
         handlers.publish_ca_info()
         assert not _vault.get_client.called
 
+    @mock.patch.object(handlers, 'client_approle_authorized')
     @mock.patch.object(handlers, 'vault')
-    def test_publish_ca_info_service_notrunning(self, _vault):
+    def test_publish_ca_info_service_notrunning(
+            self, _vault, _client_approle_authorized):
         self.is_unit_paused_set.return_value = False
         self.service_running.return_value = False
+        _client_approle_authorized.return_value = True
 
         handlers.publish_ca_info()
         self.set_flag.assert_called_with('failed.to.start')
@@ -963,30 +976,36 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
                                                            ttl='8759h')
         self.set_flag.assert_called_once_with('pki.backend.tuned')
 
+    @mock.patch.object(handlers, 'client_approle_authorized')
     @mock.patch.object(handlers, 'vault')
     @mock.patch.object(handlers, 'vault_pki')
-    def test_tune_pki_backend_config_changed(self, vault_pki, _vault):
+    def test_tune_pki_backend_config_changed(
+            self, vault_pki, _vault, _client_approle_authorized):
         self.is_unit_paused_set.return_value = False
         self._set_sealed(_vault, False)
         self.config.return_value = {
             'default-ttl': '8759h',
             'max-ttl': '87600h',
         }
+        _client_approle_authorized.return_value = True
 
         handlers.tune_pki_backend_config_changed()
         vault_pki.tune_pki_backend.assert_called_once_with(max_ttl='87600h',
                                                            ttl='8759h')
         vault_pki.update_roles.assert_called_once_with(max_ttl='87600h')
 
+    @mock.patch.object(handlers, 'client_approle_authorized')
     @mock.patch.object(handlers, 'vault')
     @mock.patch.object(handlers, 'vault_pki')
-    def test_tune_pki_backend_config_changed_sealed(self, vault_pki, _vault):
+    def test_tune_pki_backend_config_changed_sealed(
+            self, vault_pki, _vault, _client_approle_authorized):
         self.is_unit_paused_set.return_value = False
         self._set_sealed(_vault, True)
         self.config.return_value = {
             'default-ttl': '8759h',
             'max-ttl': '87600h',
         }
+        _client_approle_authorized.return_value = True
 
         handlers.tune_pki_backend_config_changed()
         assert not vault_pki.tune_pki_backend.called
