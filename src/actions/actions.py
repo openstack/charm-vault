@@ -67,6 +67,12 @@ def get_intermediate_csrs(*args):
         province=action_config.get('province'),
         organization=action_config.get('organization'),
         organizational_unit=action_config.get('organizational-unit'))
+    # We have to clear both the reactive flag, as well as the leadership
+    # managed root-ca option, otherwise, we will end up with the flag being
+    # reset in the reactive handler after this is run.
+    clear_flag('charm.vault.ca.ready')
+    hookenv.leader_set(
+        {'root-ca': None})
     hookenv.action_set({'output': csrs})
 
 
