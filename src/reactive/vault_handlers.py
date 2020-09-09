@@ -21,19 +21,20 @@ from charmhelpers.contrib.openstack.utils import (
 )
 
 from charmhelpers.core.hookenv import (
+    application_version_set,
+    atexit,
+    config,
     DEBUG,
     ERROR,
-    config,
+    hook_name,
+    leader_get,
+    leader_set,
+    local_unit,
     log,
     network_get_primary_address,
     open_port,
     status_set,
     unit_private_ip,
-    application_version_set,
-    atexit,
-    local_unit,
-    leader_set,
-    leader_get,
 )
 
 from charmhelpers.core.host import (
@@ -132,6 +133,36 @@ def validate_snap_channel(channel):
     return True
 
 
+@hook('update-status')
+def update_status():
+    """Handle update-status
+
+    Sets the flag is-update-status-hook to indicate that the current hook is an
+    update-status hook; registers an atexit handler to clear the flag at the
+    end of the hook.
+
+    This can be used to gate handlers that should not be run during
+    update-status which is supposed to be a light-weight status update.
+    """
+    set_flag('is-update-status-hook')
+
+    def atexit_clear_update_status_flag():
+        clear_flag('is-update-status-hook')
+
+    atexit(atexit_clear_update_status_flag)
+
+
+@when('is-update-status-hook')
+def check_really_is_update_status():
+    """Clear the is-update-status-hook if the hook is not assess-status.
+
+    This is in case the previous update-status hook execution died for some
+    reason and the flag never got cleared.
+    """
+    if hook_name() != 'update-status':
+        clear_flag('is-update-status-hook')
+
+
 @when_not('snap.installed.vault')
 def snap_install():
     channel = config('channel') or 'stable'
@@ -143,6 +174,7 @@ def snap_install():
         set_flag('snap.channel.invalid')
 
 
+@when_not("is-update-status-hook")
 @when('config.changed.channel')
 @when('snap.installed.vault')
 def snap_refresh():
@@ -162,6 +194,7 @@ def snap_refresh():
 def configure_vault(context):
     log("Running configure_vault", level=DEBUG)
     context['disable_mlock'] = is_container() or config('disable-mlock')
+
     context['ssl_available'] = is_state('vault.ssl.available')
 
     if is_flag_set('etcd.tls.available'):
@@ -202,6 +235,7 @@ def configure_vault(context):
         clear_flag('started')
 
 
+@when_not("is-update-status-hook")
 @when('snap.installed.vault')
 @when('db.master.available')
 @when('vault.schema.created')
@@ -214,6 +248,7 @@ def configure_vault_psql(psql):
     configure_vault(context)
 
 
+@when_not("is-update-status-hook")
 @when('snap.installed.vault')
 @when('shared-db.available')
 @when('vault.ssl.configured')
@@ -234,6 +269,7 @@ def configure_vault_mysql(mysql):
     configure_vault(context)
 
 
+@when_not("is-update-status-hook")
 @when('config.changed.disable-mlock')
 def disable_mlock_changed():
     remove_state('configured')
@@ -246,11 +282,13 @@ def upgrade_charm():
     remove_state('vault.ssl.configured')
 
 
+@when_not("is-update-status-hook")
 @when('db.connected')
 def request_db(pgsql):
     pgsql.set_database('vault')
 
 
+@when_not("is-update-status-hook")
 @when('shared-db.connected')
 def mysql_setup(database):
     """Handle the default database connection setup
@@ -262,6 +300,7 @@ def mysql_setup(database):
     database.configure(**db)
 
 
+@when_not("is-update-status-hook")
 @when('db.master.available')
 @when_not('vault.schema.created')
 def create_vault_table(pgsql):
@@ -285,6 +324,7 @@ def database_not_ready():
     remove_state('vault.schema.created')
 
 
+@when_not("is-update-status-hook")
 @when('snap.installed.vault')
 @when_not('vault.ssl.configured')
 def configure_ssl():
@@ -331,6 +371,7 @@ def ssl_ca_changed():
     remove_state('vault.ssl.configured')
 
 
+@when_not("is-update-status-hook")
 @when('configured')
 @when('nrpe-external-master.available')
 @when_not('vault.nrpe.configured')
@@ -363,6 +404,7 @@ def nagios_servicegroups_changed():
     remove_state('vault.nrpe.configured')
 
 
+@when_not("is-update-status-hook")
 @when('ha.connected')
 def cluster_connected(hacluster):
     """Configure HA resources in corosync"""
@@ -392,6 +434,7 @@ def cluster_connected(hacluster):
     hacluster.bind_resources()
 
 
+@when_not("is-update-status-hook")
 @when('configured')
 @when_not('started')
 def start_vault():
@@ -413,6 +456,7 @@ def start_vault():
         set_flag('failed.to.start')
 
 
+@when_not("is-update-status-hook")
 @when('leadership.is_leader',
       'secrets.connected')
 @when_any('endpoint.secrets.new-request', 'secrets.refresh')
@@ -508,6 +552,7 @@ def configure_secrets_backend():
     clear_flag('secrets.refresh')
 
 
+@when_not("is-update-status-hook")
 @when('secrets.connected')
 def send_vault_url_and_ca():
     secrets = endpoint_from_flag('secrets.connected')
@@ -736,6 +781,7 @@ def client_approle_authorized():
         return False
 
 
+@when_not("is-update-status-hook")
 @when_any('db.master.available', 'shared-db.available')
 @when('leadership.is_leader',
       'config.set.auto-generate-root-ca-cert')
@@ -764,6 +810,7 @@ def auto_generate_root_ca_cert():
         log("Skipping auto-generate root CA cert: {}".format(e))
 
 
+@when_not("is-update-status-hook")
 @when('leadership.is_leader',
       'leadership.set.root-ca')
 @when_not('charm.vault.ca.ready')
@@ -773,6 +820,7 @@ def takeover_cert_leadership():
     set_flag('charm.vault.ca.ready')
 
 
+@when_not("is-update-status-hook")
 @when_any('db.master.available', 'shared-db.available')
 @when('leadership.is_leader',
       'charm.vault.ca.ready',
@@ -798,6 +846,7 @@ def publish_ca_info():
             tls.set_chain(chain)
 
 
+@when_not("is-update-status-hook")
 @when_any('db.master.available', 'shared-db.available')
 @when('leadership.is_leader',
       'charm.vault.ca.ready',
@@ -831,6 +880,7 @@ def publish_global_client_cert():
     tls.set_client_cert(bundle['certificate'], bundle['private_key'])
 
 
+@when_not("is-update-status-hook")
 @when('leadership.is_leader',
       'charm.vault.ca.ready',
       'certificates.available')
@@ -886,6 +936,7 @@ def post_series_upgrade():
     unitdata.kv().set('charm.vault.series-upgrading', False)
 
 
+@when_not("is-update-status-hook")
 @when('leadership.is_leader',
       'charm.vault.ca.ready')
 @when_not('pki.backend.tuned')
@@ -898,6 +949,7 @@ def tune_pki_backend():
     set_flag('pki.backend.tuned')
 
 
+@when_not("is-update-status-hook")
 @when_any('db.master.available', 'shared-db.available')
 @when('leadership.is_leader',
       'charm.vault.ca.ready')
