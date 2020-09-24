@@ -72,7 +72,7 @@ if __name__ == '__main__':
                   serverv, snapv))
         sys.exit(0)
 
-    print('CRITICAL: running vault ({}) is not the same '
+    print('WARNING: running vault ({}) is not the same '
           'as the installed snap ({})'.format(
               serverv, snapv))
-    sys.exit(2)
+    sys.exit(1)
