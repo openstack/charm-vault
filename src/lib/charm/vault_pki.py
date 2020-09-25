@@ -206,7 +206,7 @@ def upload_signed_csr(pem, allowed_domains, allow_subdomains=True,
     # (hvac module doesn't expose a method for this, hence the _post call)
     client._post(
         'v1/{}/intermediate/set-signed'.format(CHARM_PKI_MP),
-        json={'certificate': pem})
+        json={'certificate': pem.rstrip()})
     # Generated certificates can have the CRL location and the location of the
     # issuing certificate encoded.
     addr = vault.get_access_address()
