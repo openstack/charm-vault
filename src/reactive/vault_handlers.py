@@ -754,6 +754,15 @@ def _assess_status():
 
     mlock_disabled = is_container() or config('disable-mlock')
 
+    vault_installed_version = snap.get_installed_version('vault')
+    vault_running_version = health.get('version')
+    if vault_installed_version != vault_running_version:
+        status_set(
+            'active',
+            'New version of vault installed, manual intervention required '
+            'to restart the service.')
+        return
+
     status_set(
         'active',
         'Unit is ready '
