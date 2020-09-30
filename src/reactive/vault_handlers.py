@@ -851,6 +851,7 @@ def publish_ca_info():
 @when('leadership.is_leader',
       'charm.vault.ca.ready',
       'certificates.available')
+@when_not('config.changed')
 def publish_global_client_cert():
     """
     This is for backwards compatibility with older tls-certificate clients
