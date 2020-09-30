@@ -324,6 +324,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
                            _assess_interface_groups,
                            _client_approle_authorized,
                            _leader_get):
+        self.snap.get_installed_version.return_value = '0.9.0'
         self.is_flag_set.return_value = False
         get_vault_health.return_value = self._health_response
         _assess_interface_groups.return_value = []
@@ -430,6 +431,24 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         handlers._assess_status()
         self.status_set.assert_called_with(
             'blocked', 'Unit is sealed')
+
+    @patch.object(handlers, 'leader_get')
+    @patch.object(handlers, 'client_approle_authorized')
+    @patch.object(handlers, '_assess_interface_groups')
+    @patch.object(handlers.vault, 'get_vault_health')
+    def test_assess_status_vault_snap_refresh(self, get_vault_health,
+                                              _assess_interface_groups,
+                                              _client_approle_authorized,
+                                              _leader_get):
+        # New version of vault installed 0.9.1
+        self.snap.get_installed_version.return_value = '0.9.1'
+        self.is_flag_set.return_value = False
+        get_vault_health.return_value = self._health_response
+        handlers._assess_status()
+        self.status_set.assert_called_with(
+            'active',
+            'New version of vault installed, manual intervention '
+            'required to restart the service.')
 
     def test_assess_interface_groups(self):
         flags = {
