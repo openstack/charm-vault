@@ -1,4 +1,5 @@
 import base64
+import os
 import psycopg2
 import subprocess
 import tenacity
@@ -12,6 +13,7 @@ from charmhelpers.contrib.charmsupport.nrpe import (
     add_init_service_checks,
     get_nagios_hostname,
     get_nagios_unit_name,
+    remove_deprecated_check,
 )
 
 from charmhelpers.contrib.openstack.utils import (
@@ -380,15 +382,20 @@ def update_nagios(svc):
     hostname = get_nagios_hostname()
     current_unit = get_nagios_unit_name()
     nrpe = NRPE(hostname=hostname)
+    remove_deprecated_check(nrpe, ['vault_version'])
     add_init_service_checks(nrpe, ['vault'], current_unit)
+    try:
+        os.remove('/usr/lib/nagios/plugins/check_vault_version.py')
+    except FileNotFoundError:
+        pass
     write_file(
-        '/usr/lib/nagios/plugins/check_vault_version.py',
-        open('files/nagios/check_vault_version.py', 'rb').read(),
+        '/usr/lib/nagios/plugins/check_vault_health.py',
+        open('files/nagios/check_vault_health.py', 'rb').read(),
         perms=0o755)
     nrpe.add_check(
-        'vault_version',
-        'Check running vault server version is same as installed snap',
-        '/usr/lib/nagios/plugins/check_vault_version.py',
+        'vault_health',
+        'Check running vault server version and health',
+        '/usr/lib/nagios/plugins/check_vault_health.py',
     )
     nrpe.write()
     set_state('vault.nrpe.configured')

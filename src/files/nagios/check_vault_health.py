@@ -44,7 +44,7 @@ def get_vault_snap_version():
         return version
 
 
-def get_vault_server_version(verify=True):
+def get_vault_server_health(verify=True):
     ctx = None
     if not verify:
         ctx = ssl.create_default_context()
@@ -52,7 +52,7 @@ def get_vault_server_version(verify=True):
         ctx.verify_mode = ssl.CERT_NONE
 
     with urlopen(VAULT_HEALTH_URL, context=ctx) as health:
-        return json.loads(health.read().decode('utf-8'))['version']
+        return json.loads(health.read().decode('utf-8'))
 
 
 if __name__ == '__main__':
@@ -64,12 +64,17 @@ if __name__ == '__main__':
         sys.exit(2)
 
     try:
-        serverv = get_vault_server_version(verify=VAULT_VERIFY_SSL)
+        health = get_vault_server_health(verify=VAULT_VERIFY_SSL)
     except Exception as e:
-        print('CRITICAL: failed to fetch version of '
+        print('CRITICAL: failed to fetch health of '
               'running vault server: {}'.format(e))
         sys.exit(2)
 
+    if health['sealed'] is True:
+        print('CRITICAL: vault is sealed.')
+        sys.exit(2)
+
+    serverv = health['version']
     if serverv == snapv:
         print('OK: running vault ({}) is the same '
               'as the installed snap ({})'.format(
