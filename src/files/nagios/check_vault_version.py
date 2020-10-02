@@ -15,7 +15,11 @@ import sys
 from textwrap import dedent
 from urllib.request import urlopen
 
-VAULT_HEALTH_URL = 'http://127.0.0.1:8220/v1/sys/health?standbyok=true'
+VAULT_HEALTH_URL = 'http://127.0.0.1:8220/v1/sys/health?standbycode=200&'\
+                   'drsecondarycode=200&'\
+                   'performancestandbycode=200&'\
+                   'sealedcode=200&'\
+                   'uninitcode=200'
 VAULT_VERIFY_SSL = False
 
 SNAPD_INFO_REQUEST = dedent("""\
