@@ -13,8 +13,10 @@ The charm installs Vault from a [snap][snap-upstream].
 
 ## Configuration
 
-This section covers common configuration options. See file `config.yaml` for
-the full list of options, along with their descriptions and default values.
+This section covers common and/or important configuration options. See file
+`config.yaml` for the full list of options, along with their descriptions and
+default values. See the [Juju documentation][juju-docs-config-apps] for details
+on configuring applications.
 
 #### `channel`
 
@@ -23,29 +25,55 @@ The `channel` option sets the snap channel to use for deployment (e.g.
 
 ## Deployment
 
-Deploy a single vault unit in this way:
+Vault is often containerised. Here a single unit is deployed to a new
+container on machine '1':
 
-    juju deploy vault
+    juju deploy --to lxd:1 vault
 
-Then relate it to either MySQL or PostgreSQL.
+> **Note**: When Vault is deployed to metal or to a KVM guest the charm will
+  enable mlock (memory locking) to prevent secrets from being saved to disk via
+  page swapping. The mlock feature is not available to containers.
 
-For MySQL 5:
+Now connect the vault application to an existing database. This can be the
+cloud's database or a separate, dedicated database.
+
+Some database applications are influenced by the series. Prior to focal
+[percona-cluster][percona-cluster-charm] is used, otherwise it is replaced by
+[mysql-innodb-cluster][mysql-innodb-cluster-charm]. The
+[postgresql][postgresql-charm] application can also be used.
+
+For percona-cluster:
 
     juju add-relation vault:shared-db percona-cluster:shared-db
 
-For MySQL 8:
+For mysql-innodb-cluster:
 
     juju deploy mysql-router vault-mysql-router
     juju add-relation vault-mysql-router:db-router mysql-innodb-cluster:db-router
     juju add-relation vault-mysql-router:shared-db vault:shared-db
 
-For PostgreSQL, its version and the underlying machine series must be
-compatible (e.g. 9.5/xenial or 10/bionic). Use configuration option `version`
-with the [postgresql][postgresql-charm] charm to select a version. For example,
-on Xenial:
+For postgresql:
 
-    juju deploy --config version=9.5 --series xenial postgresql
     juju add-relation vault:db postgresql:db
+
+> **Note**: For PostgreSQL, its version and the underlying machine series must
+  be compatible (e.g. 9.5/xenial or 10/bionic). The postgresql charm's
+  configuration option `version` is used to select a version at deploy time.
+
+## TLS
+
+Communication with the Vault REST API can be encrypted with TLS. This is
+configured with the following charm configuration options:
+
+* `ssl-ca`
+* `ssl-cert`
+* `ssl-chain`
+* `ssl-key`
+
+> **Note**: The process of encrypting the Vault API is separate from that of
+  using Vault to manage the encryption of OpenStack API services. See
+  [Managing TLS certificates with Vault][cdg-vault-certs] in the
+  [OpenStack Charms Deployment Guide][cdg] for details.
 
 ## Post-deployment tasks
 
@@ -55,7 +83,7 @@ Once the vault application is deployed the following tasks must be performed:
 * Unsealing of Vault
 * Charm authorisation
 
-These tasks are covered in appendix [Vault][cdg-app-vault] of the
+These are covered in the [Vault][cdg-vault] section of the
 [OpenStack Charms Deployment Guide][cdg].
 
 ## Actions
@@ -74,8 +102,22 @@ Actions allow specific operations to be performed on a per-unit basis.
 * `resume`
 * `upload-signed-csr`
 
-To display action descriptions run `juju actions vault`. If the charm
-is not deployed then see file ``actions.yaml``.
+To display action descriptions run `juju actions vault`. If the charm is not
+deployed then see file `actions.yaml`.
+
+## High availability
+
+When more than one unit is deployed with the [hacluster][hacluster-charm]
+application the charm will bring up an HA active/active cluster.
+
+There are two mutually exclusive high availability options: using virtual IP(s)
+or DNS. In both cases the hacluster subordinate charm is used to provide the
+Corosync and Pacemaker backend HA functionality.
+
+In addition, HA Vault will require the etcd and easyrsa applications.
+
+See [OpenStack high availability][cdg-ha-apps] in the [OpenStack Charms
+Deployment Guide][cdg] for details.
 
 # Bugs
 
@@ -90,8 +132,13 @@ For general charm questions refer to the [OpenStack Charm Guide][cg].
 [lp-bugs-charm-vault]: https://bugs.launchpad.net/vault-charm/+filebug
 [juju-docs-actions]: https://jaas.ai/docs/actions
 [snap-upstream]: https://snapcraft.io/
+[hacluster-charm]: https://jaas.ai/hacluster
 [vault-charm]: https://jaas.ai/vault
+[percona-cluster-charm]: https://jaas.ai/percona-cluster
+[mysql-innodb-cluster-charm]: https://jaas.ai/mysql-innodb-cluster
 [postgresql-charm]: https://jaas.ai/postgresql
 [vault-upstream]: https://www.vaultproject.io/docs/what-is-vault/
-[cdg-app-vault]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide/latest/app-vault.html
-[cdg-app-ha-vault]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide/latest/app-ha.html#vault
+[cdg-vault]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide/latest/app-vault.html
+[cdg-vault-certs]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide/latest/app-certificate-management.html
+[cdg-ha-apps]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide/latest/app-ha.html#ha-applications
+[juju-docs-config-apps]: https://juju.is/docs/configuring-applications
