@@ -255,7 +255,8 @@ def configure_vault_psql(psql):
 @when('shared-db.available')
 @when('vault.ssl.configured')
 def configure_vault_mysql(mysql):
-    if local_unit() not in mysql.allowed_units():
+    if (not mysql.allowed_units() or
+            local_unit() not in mysql.allowed_units()):
         log("Deferring vault configuration until"
             " MySQL access is granted", level=DEBUG)
         return
