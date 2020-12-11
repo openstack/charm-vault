@@ -188,6 +188,18 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             'storage_name': 'mysql',
             'mysql_db_relation': mysql})
 
+        # Not ready
+        configure_vault.reset_mock()
+        mysql.allowed_units.return_value = None
+        handlers.configure_vault_mysql(mysql)
+        configure_vault.assert_not_called()
+
+        # Not ready
+        configure_vault.reset_mock()
+        mysql.allowed_units.return_value = ['vault/382']
+        handlers.configure_vault_mysql(mysql)
+        configure_vault.assert_not_called()
+
     @patch.object(handlers, 'base64')
     @patch.object(handlers, 'write_file')
     @patch.object(handlers, 'configure_vault')
