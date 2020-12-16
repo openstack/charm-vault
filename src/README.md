@@ -1,13 +1,15 @@
 # Overview
 
-[Vault][vault-upstream] secures, stores, and controls access to tokens,
-passwords, certificates, API keys, and other secrets in modern computing. Vault
-handles leasing, key revocation, key rolling, and auditing. Through a unified
-API, users can access an encrypted key/value store and network
-encryption-as-a-service, or generate AWS IAM/STS credentials, SQL/NoSQL
-databases, X.509 certificates, SSH credentials, and more.
+The vault charm deploys [Vault][vault-upstream], a tool for securely managing
+secrets used in modern computing (e.g. passwords, certificates, API keys).
+Charmed OpenStack employs Vault to handle TLS certificates, allowing for a
+centrally managed solution for the encryption of API services across the cloud.
+Vault is also commonly used to implement [Encryption at Rest][cdg-encryption]
+on Charmed OpenStack.
 
 The charm installs Vault from a [snap][snap-upstream].
+
+> **Important**: Vault is a requirement for the OVN charms.
 
 # Usage
 
@@ -24,6 +26,9 @@ The `channel` option sets the snap channel to use for deployment (e.g.
 'latest/edge'). The default value is 'latest/stable'.
 
 ## Deployment
+
+> **Important**: Some steps must be performed after deployment. Section
+  'Post-deployment tasks' covers this.
 
 Vault is often containerised. Here a single unit is deployed to a new
 container on machine '1':
@@ -77,14 +82,127 @@ configured with the following charm configuration options:
 
 ## Post-deployment tasks
 
-Once the vault application is deployed the following tasks must be performed:
+Once the application is deployed the following tasks **must** be performed:
 
 * Vault initialisation
 * Unsealing of Vault
 * Charm authorisation
 
-These are covered in the [Vault][cdg-vault] section of the
-[OpenStack Charms Deployment Guide][cdg].
+Vault itself will be needed as a client to perform these tasks.
+
+### Vault client
+
+Vault is needed as a client in order to manage the Vault deployment. Install it
+on the host where the Juju client resides:
+
+    sudo snap install vault
+
+### Initialise Vault
+
+Identify the vault unit by setting the ``VAULT_ADDR`` environment variable
+based on the IP address of the unit. This can be discovered from `juju status`
+output (column 'Public address'). Here we'll use '10.0.0.126':
+
+    export VAULT_ADDR="http://10.0.0.126:8200"
+
+Initialise Vault by specifying the number of unseal keys that should get
+generated as well as the number of unseal keys that are needed in order to
+complete the unseal process. Below we will specify five and three,
+respectively:
+
+    vault operator init -key-shares=5 -key-threshold=3
+
+Sample output:
+
+    Unseal Key 1: XONSc5Ku8HJu+ix/zbzWhMvDTiPpwWX0W1X/e/J1Xixv
+    Unseal Key 2: J/fQCPvDeMFJT3WprfPy17gwvyPxcvf+GV751fTHUoN/
+    Unseal Key 3: +bRfX5HMISegsODqNZxvNcupQp/kYQuhsQ2XA+GamjY4
+    Unseal Key 4: FMRTPJwzykgXFQOl2XTupw2lfgLOXbbIep9wgi9jQ2ls
+    Unseal Key 5: 7rrxiIVQQWbDTJPMsqrZDKftD6JxJi6vFOlyC0KSabDB
+
+    Initial Root Token: s.ezlJjFw8ZDZO6KbkAkm605Qv
+
+    Vault initialized with 5 key shares and a key threshold of 3. Please securely
+    distribute the key shares printed above. When the Vault is re-sealed,
+    restarted, or stopped, you must supply at least 3 of these keys to unseal it
+    before it can start servicing requests.
+
+    Vault does not store the generated master key. Without at least 3 key to
+    reconstruct the master key, Vault will remain permanently sealed!
+
+    It is possible to generate new unseal keys, provided you have a quorum of
+    existing unseal keys shares. See "vault operator rekey" for more information.
+
+Besides displaying the five unseal keys the output also includes an "initial
+root token". This token is used to access the Vault API.
+
+> **Warning**: It is not possible to unseal Vault without the unseal keys, nor
+  is it possible to manage Vault without the initial root token. **Store this
+  information in a safe place immediately**.
+
+### Unseal Vault
+
+Unseal the vault unit using the requisite number of unique keys (three in this
+example):
+
+    vault operator unseal XONSc5Ku8HJu+ix/zbzWhMvDTiPpwWX0W1X/e/J1Xixv
+    vault operator unseal FMRTPJwzykgXFQOl2XTupw2lfgLOXbbIep9wgi9jQ2ls
+    vault operator unseal 7rrxiIVQQWbDTJPMsqrZDKftD6JxJi6vFOlyC0KSabDB
+
+In an HA environment repeat the unseal process for each unit. Prior to
+unsealing a unit change the value of the ``VAULT_ADDR`` variable so that it
+points to that unit.
+
+> **Note**: Maintenance work on the cloud may require vault units to be paused
+  and later resumed. A resumed vault unit will be sealed and will therefore
+  require unsealing. See [Managing power events][cdg-power-events] in the
+  [OpenStack Charms Deployment Guide][cdg] for details.
+
+Proceed to the next step once all units have been unsealed.
+
+### Authorise the vault charm
+
+The vault charm must be authorised to access the Vault deployment in order to
+create storage backends (for secrets) and roles (to allow other applications to
+access Vault for encryption key storage).
+
+Generate a root token with a limited lifetime (10 minutes here) using the
+initial root token:
+
+    export VAULT_TOKEN=s.ezlJjFw8ZDZO6KbkAkm605Qv
+    vault token create -ttl=10m
+
+Sample output:
+
+    Key                  Value
+    ---                  -----
+    token                s.QMhaOED3UGQ4MeH3fmGOpNED
+    token_accessor       nApB972Dp2lnTTIF5VXQqnnb
+    token_duration       10m
+    token_renewable      true
+    token_policies       ["root"]
+    identity_policies    []
+    policies             ["root"]
+
+This temporary token ('token') is then used to authorise the charm:
+
+    juju run-action --wait vault/leader authorize-charm token=s.QMhaOED3UGQ4MeH3fmGOpNED
+
+After the action completes execution, the vault unit(s) will become active and
+any pending requests for secrets storage will be processed for consuming
+applications.
+
+Here is sample status output for an unsealed three-unit Vault cluster:
+
+    vault/0*                 active    idle   0/lxd/1  10.0.0.126      8200/tcp  Unit is ready (active: false, mlock: disabled)
+      vault-hacluster/0*     active    idle            10.0.0.126                Unit is ready and clustered
+      vault-mysql-router/0*  active    idle            10.0.0.126                Unit is ready
+    vault/1                  active    idle   1/lxd/1  10.0.0.130      8200/tcp  Unit is ready (active: true, mlock: disabled)
+      vault-hacluster/2      active    idle            10.0.0.130                Unit is ready and clustered
+      vault-mysql-router/2   active    idle            10.0.0.130                Unit is ready
+    vault/2                  active    idle   2/lxd/1  10.0.0.132      8200/tcp  Unit is ready (active: false, mlock: disabled)
+      vault-hacluster/1      active    idle            10.0.0.132                Unit is ready and clustered
+      vault-mysql-router/1   active    idle            10.0.0.132                Unit is ready
 
 ## Actions
 
@@ -138,7 +256,8 @@ For general charm questions refer to the [OpenStack Charm Guide][cg].
 [mysql-innodb-cluster-charm]: https://jaas.ai/mysql-innodb-cluster
 [postgresql-charm]: https://jaas.ai/postgresql
 [vault-upstream]: https://www.vaultproject.io/docs/what-is-vault/
-[cdg-vault]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide/latest/app-vault.html
 [cdg-vault-certs]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide/latest/app-certificate-management.html
 [cdg-ha-apps]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide/latest/app-ha.html#ha-applications
 [juju-docs-config-apps]: https://juju.is/docs/configuring-applications
+[cdg-power-events]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide/latest/app-managing-power-events.html#vault
+[cdg-encryption]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide/latest/app-encryption-at-rest.html
