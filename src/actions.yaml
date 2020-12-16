@@ -133,4 +133,4 @@ disable-pki:
 pause:
   description: Pause the vault unit.
 resume:
-  descrpition: Resume the vault unit.
+  description: Resume the vault unit.
