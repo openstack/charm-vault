@@ -790,7 +790,8 @@ def client_approle_authorized():
         return True
     except (vault.hvac.exceptions.InternalServerError,
             vault.VaultNotReady,
-            vault.hvac.exceptions.VaultDown):
+            vault.hvac.exceptions.VaultDown,
+            vault.requests.exceptions.ReadTimeout):
         log("InternalServerError: Unable to athorize approle. "
             "This may indicate failure to communicate with the database ",
             "WARNING")
