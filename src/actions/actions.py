@@ -41,6 +41,7 @@ def authorize_charm_action(*args):
     """
     if not hookenv.is_leader():
         hookenv.action_fail('Please run action on lead unit')
+        return
     action_config = hookenv.action_get()
     role_id = vault.setup_charm_vault_access(action_config['token'])
     hookenv.leader_set({vault.CHARM_ACCESS_ROLE_ID: role_id})
@@ -58,6 +59,7 @@ def refresh_secrets(*args):
 def get_intermediate_csrs(*args):
     if not hookenv.is_leader():
         hookenv.action_fail('Please run action on lead unit')
+        return
     action_config = hookenv.action_get() or {}
     csrs = vault_pki.get_csr(
         ttl=action_config.get('ttl'),
