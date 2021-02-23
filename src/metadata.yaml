@@ -32,6 +32,11 @@ requires:
   ha:
     interface: hacluster
     scope: container
+  lb-provider:
+    # Optional relation to a load balancer provider. Mutually exclusive
+    # with the vip or dns-ha-access-record config options.
+    interface: loadbalancer
+    limit: 1
 provides:
   nrpe-external-master:
     interface: nrpe-external-master

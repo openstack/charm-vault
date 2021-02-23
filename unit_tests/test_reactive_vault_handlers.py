@@ -52,6 +52,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         self.patches = [
             'config',
             'endpoint_from_flag',
+            'endpoint_from_name',
             'is_state',
             'log',
             'network_get_primary_address',
@@ -78,6 +79,9 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         self.kv = mock.MagicMock()
         self.kv.get.return_value = False
         self.unitdata.kv.return_value = self.kv
+        self.endpoint_from_name().is_available = False
+        self.endpoint_from_name().has_response = False
+        self.patch_object(handlers.vault.hookenv, 'charm_dir', 'src')
 
     def test_ssl_available(self):
         self.assertFalse(handlers.ssl_available({
@@ -1095,3 +1099,56 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         assert service_running.call_count == 2
         set_flag.assert_called_once_with('started')
         prepare_vault.assert_called_once_with()
+
+    def test_loadbalancer(self):
+        self.is_flag_set.return_value = False
+        self.patch_object(handlers.vault, 'get_vip', return_value=None)
+        mock_secrets = self.endpoint_from_flag()
+        lb_provider = self.endpoint_from_name()
+        lb_provider.has_response = True
+        response = lb_provider.get_response()
+
+        response.success = False
+        handlers.send_vault_url_and_ca()
+        self.assertFalse(mock_secrets.publish_url.called)
+
+        response.error = None
+        response.address = 'loadbalancer'
+        handlers.send_vault_url_and_ca()
+        lb_provider.ack_response.assert_called_with(response)
+        mock_secrets.publish_url.assert_has_calls([
+            call(vault_url='http://loadbalancer:8200',
+                 remote_binding='access'),
+            call(vault_url='http://loadbalancer:8200',
+                 remote_binding='external'),
+        ])
+
+    @patch.object(handlers, 'leader_get')
+    @patch.object(handlers, 'client_approle_authorized')
+    @patch.object(handlers, '_assess_interface_groups')
+    @patch.object(handlers.vault, 'get_vault_health')
+    def test_assess_status_loadbalancer(self, get_vault_health,
+                                        _assess_interface_groups,
+                                        _client_approle_authorized,
+                                        _leader_get):
+        self.is_flag_set.return_value = False
+        get_vault_health.return_value = self._health_response
+        self.endpoint_from_name().is_available = True
+        self.endpoint_from_name().has_response = False
+        handlers._assess_status()
+        self.status_set.assert_called_with(
+            'active', mock.ANY
+        )
+        self.is_flag_set.side_effect = lambda f: f == 'leadership.is_leader'
+        handlers._assess_status()
+        self.status_set.assert_called_with(
+            'waiting', 'Waiting for load balancer'
+        )
+
+        self.endpoint_from_name().has_response = True
+        self.endpoint_from_name().get_response().error = True
+        self.endpoint_from_name().get_response().error_message = 'just because'
+        handlers._assess_status()
+        self.status_set.assert_called_with(
+            'blocked', 'Load balancer failed: just because'
+        )

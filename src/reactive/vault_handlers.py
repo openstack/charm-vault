@@ -66,6 +66,7 @@ from charms.reactive import (
 
 from charms.reactive.relations import (
     endpoint_from_flag,
+    endpoint_from_name,
 )
 
 from charms.reactive.flags import (
@@ -283,6 +284,7 @@ def upgrade_charm():
     remove_state('configured')
     remove_state('vault.nrpe.configured')
     remove_state('vault.ssl.configured')
+    remove_state('vault.requested-lb')
 
 
 @when_not("is-update-status-hook")
@@ -560,10 +562,29 @@ def configure_secrets_backend():
     clear_flag('secrets.refresh')
 
 
+@when('endpoint.lb-provider.available')
+@when('leadership.is_leader')
+@when_not('vault.requested-lb')
+def request_lb():
+    lb_provider = endpoint_from_name('lb-provider')
+    req = lb_provider.get_request('vault')
+    req.protocol = req.protocols.tcp
+    req.port_mapping = {8220: 8220}
+    lb_provider.send_request(req)
+    set_flag('vault.requested-lb')
+
+
+@when('vault.requested-lb')
+@when_not('endpoint.lb-provider.available')
+def clear_requested_lb():
+    clear_flag('vault.requested-lb')
+
+
 @when_not("is-update-status-hook")
 @when('secrets.connected')
 def send_vault_url_and_ca():
     secrets = endpoint_from_flag('secrets.connected')
+    lb_provider = endpoint_from_name('lb-provider')
     vault_url_external = None
     hostname = config('hostname')
     vip = vault.get_vip()
@@ -580,6 +601,16 @@ def send_vault_url_and_ca():
         log("VIP is set but ha.available is not yet set, skipping "
             "send_vault_url_and_ca.", level=DEBUG)
         return
+    elif lb_provider.has_response:
+        response = lb_provider.get_response('vault')
+        if response.error:
+            log('Load balancer failed, skipping: '
+                '{}'.format(response.error_message or response.error_fields),
+                level=ERROR)
+            return
+        vault_url = vault.get_api_url(address=response.address)
+        vault_url_external = vault_url
+        lb_provider.ack_response(response)
     else:
         vault_url = vault.get_api_url()
         vault_url_external = vault.get_api_url(binding='external')
@@ -694,6 +725,15 @@ def _assess_status():
         status_set('blocked',
                    'vip and dns-ha-access-record configured')
         return
+    if is_flag_set('config.lb_vip.invalid'):
+        status_set('blocked',
+                   'lb-provider and vip are mutually exclusive')
+        return
+    if is_flag_set('config.lb_dns.invalid'):
+        status_set('blocked',
+                   'lb-provider and dns-ha-access-record are '
+                   'mutually exclusive')
+        return
 
     if unitdata.kv().get('charm.vault.series-upgrading'):
         status_set("blocked",
@@ -755,6 +795,20 @@ def _assess_status():
     if not client_approle_authorized():
         status_set('blocked', 'Vault cannot authorize approle')
         return
+
+    lb_provider = endpoint_from_name('lb-provider')
+    is_leader = is_flag_set('leadership.is_leader')
+    if is_leader and lb_provider.is_available:
+        if not lb_provider.has_response:
+            status_set('waiting', 'Waiting for load balancer')
+            return
+        response = lb_provider.get_response('vault')
+        if response.error:
+            status_set('blocked',
+                       'Load balancer failed: '
+                       '{}'.format(response.error_message or
+                                   response.error_fields))
+            return
 
     has_ca = is_flag_set('charm.vault.ca.ready')
     has_cert_reqs = is_flag_set('certificates.certs.requested')
