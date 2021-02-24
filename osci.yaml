@@ -1,0 +1,64 @@
+- project:
+    templates:
+      - charm-unit-jobs
+    check:
+      jobs:
+      - xenial-ha-mysql
+      - xenial-postgres
+      - xenial-mysql
+      - bionic-postgres
+      - bionic-mysql
+      - focal-mysql8
+      - groovy-mysql8
+    vars:
+      needs_charm_build: true
+      charm_build_name: vault
+
+- job:
+    name: bionic-mysql
+    parent: func-target
+    dependencies:
+      - osci-lint
+      - tox-py35
+      - tox-py36
+      - tox-py37
+      - tox-py38
+    vars:
+      tox_extra_args: bionic-mysql
+- job:
+    name: xenial-ha-mysql
+    parent: func-target
+    dependencies: &smoke-jobs
+      - bionic-mysql
+    vars:
+      tox_extra_args: xenial-ha-mysql
+- job:
+    name: xenial-postgres
+    parent: func-target
+    dependencies: *smoke-jobs
+    vars:
+      tox_extra_args: xenial-postgres
+- job:
+    name: xenial-mysql
+    parent: func-target
+    dependencies: *smoke-jobs
+    vars:
+      tox_extra_args: xenial-mysql
+- job:
+    name: bionic-postgres
+    parent: func-target
+    dependencies: *smoke-jobs
+    vars:
+      tox_extra_args: bionic-postgres
+- job:
+    name: focal-mysql8
+    parent: func-target
+    dependencies: *smoke-jobs
+    vars:
+      tox_extra_args: focal-mysql8
+- job:
+    name: groovy-mysql8
+    parent: func-target
+    dependencies: *smoke-jobs
+    vars:
+      tox_extra_args: groovy-mysql8
