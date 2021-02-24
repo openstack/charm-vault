@@ -76,9 +76,9 @@ configured with the following charm configuration options:
 * `ssl-key`
 
 > **Note**: The process of encrypting the Vault API is separate from that of
-  using Vault to manage the encryption of OpenStack API services. See
-  [Managing TLS certificates with Vault][cdg-vault-certs] in the
-  [OpenStack Charms Deployment Guide][cdg] for details.
+ using Vault to manage the encryption of OpenStack API services. See [Managing
+ TLS certificates][cdg-vault-certs] in the [OpenStack Charms Deployment
+  Guide][cdg] for details.
 
 ## Post-deployment tasks
 
@@ -220,8 +220,8 @@ Actions allow specific operations to be performed on a per-unit basis.
 * `resume`
 * `upload-signed-csr`
 
-To display action descriptions run `juju actions vault`. If the charm is not
-deployed then see file `actions.yaml`.
+To display action descriptions run `juju actions --schema vault`. If the charm
+is not deployed then see file `actions.yaml`.
 
 ## High availability
 
@@ -234,14 +234,20 @@ Corosync and Pacemaker backend HA functionality.
 
 In addition, HA Vault will require the etcd and easyrsa applications.
 
-See [OpenStack high availability][cdg-ha-apps] in the [OpenStack Charms
+See [Infrastructure high availability][cdg-ha-apps] in the [OpenStack Charms
 Deployment Guide][cdg] for details.
+
+# Documentation
+
+The OpenStack Charms project maintains two documentation guides:
+
+* [OpenStack Charm Guide][cg]: for project information, including development
+  and support notes
+* [OpenStack Charms Deployment Guide][cdg]: for charm usage information
 
 # Bugs
 
 Please report bugs on [Launchpad][lp-bugs-charm-vault].
-
-For general charm questions refer to the [OpenStack Charm Guide][cg].
 
 <!-- LINKS -->
 
