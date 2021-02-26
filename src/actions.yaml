@@ -134,3 +134,7 @@ pause:
   description: Pause the vault unit.
 resume:
   description: Resume the vault unit.
+restart:
+  description: Restarts the vault unit.
+reload:
+  description: Reloads the vault unit.

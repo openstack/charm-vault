@@ -27,6 +27,7 @@ basic.init_config_states()
 
 import charmhelpers.core.hookenv as hookenv
 import charmhelpers.core.unitdata as unitdata
+import charmhelpers.core.host as host
 
 import charm.vault as vault
 import charm.vault_pki as vault_pki
@@ -164,6 +165,31 @@ def resume(args):
     handlers.resume_vault_unit()
 
 
+def restart(args):
+    """Restart the Vault service.
+
+    The result of this action will be to have vault daemon
+    restarted.
+    Mind that this action will cause the Vault to be sealed.
+
+    """
+    host.service_restart(service_name='vault')
+
+
+def reload(args):
+    """Reload the Vault service.
+
+    The result of this action will be to have vault daemon
+    reloaded (preferably with HUP signal in systemd).
+    That allows for live changes in listener (only certs)
+    without need of User intervention to unseal the vault.
+    Unfortunately other options like disable_mlock, ui
+    are not supported.
+
+    """
+    host.service_reload(service_name='vault')
+
+
 # Actions to function mapping, to allow for illegal python action names that
 # can map to a python function.
 ACTIONS = {
@@ -177,6 +203,8 @@ ACTIONS = {
     "disable-pki": disable_pki,
     "pause": pause,
     "resume": resume,
+    "restart": restart,
+    "reload": reload
 }
 
 

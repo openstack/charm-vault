@@ -219,6 +219,8 @@ Actions allow specific operations to be performed on a per-unit basis.
 * `reissue-certificates`
 * `resume`
 * `upload-signed-csr`
+* `reload`
+* `restart`
 
 To display action descriptions run `juju actions --schema vault`. If the charm
 is not deployed then see file `actions.yaml`.
