@@ -16,6 +16,7 @@ series:
 - bionic
 - focal
 - groovy
+- hirsute
 tags:
 - security
 extra-bindings:
