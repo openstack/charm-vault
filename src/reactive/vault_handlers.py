@@ -810,9 +810,10 @@ def _assess_status():
                                    response.error_fields))
             return
 
+    is_leader = is_flag_set('leadership.is_leader')
     has_ca = is_flag_set('charm.vault.ca.ready')
     has_cert_reqs = is_flag_set('certificates.certs.requested')
-    if has_cert_reqs and not has_ca:
+    if is_leader and has_cert_reqs and not has_ca:
         status_set('blocked', 'Missing CA cert')
         return
 

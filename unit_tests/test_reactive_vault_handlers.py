@@ -474,10 +474,12 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
                                             _assess_interface_groups,
                                             _client_approle_authorized,
                                             _leader_get):
-        self.is_flag_set.side_effect = lambda f: (
-            True if f == 'certificates.certs.requested' else False
-        )
+        flags = ['certificates.certs.requested']
+        self.is_flag_set.side_effect = lambda f: f in flags
         get_vault_health.return_value = self._health_response
+        handlers._assess_status()
+        self.status_set.assert_called_with('active', mock.ANY)
+        flags.append('leadership.is_leader')
         handlers._assess_status()
         self.status_set.assert_called_with('blocked', 'Missing CA cert')
 
