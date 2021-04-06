@@ -204,6 +204,11 @@ Here is sample status output for an unsealed three-unit Vault cluster:
       vault-hacluster/1      active    idle            10.0.0.132                Unit is ready and clustered
       vault-mysql-router/1   active    idle            10.0.0.132                Unit is ready
 
+Now that the post-deployment steps have been completed you will most likely
+want to add a CA certificate to Vault. See [Managing TLS
+certificates][cdg-vault-certs-add] in the [OpenStack Charms Deployment
+Guide][cdg] for details.
+
 ## Actions
 
 This section lists Juju [actions][juju-docs-actions] supported by the charm.
@@ -265,6 +270,7 @@ Please report bugs on [Launchpad][lp-bugs-charm-vault].
 [postgresql-charm]: https://jaas.ai/postgresql
 [vault-upstream]: https://www.vaultproject.io/docs/what-is-vault/
 [cdg-vault-certs]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide/latest/app-certificate-management.html
+[cdg-vault-certs-add]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide/latest/app-certificate-management.html#add-a-ca-certificate
 [cdg-ha-apps]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide/latest/app-ha.html#ha-applications
 [juju-docs-config-apps]: https://juju.is/docs/configuring-applications
 [cdg-power-events]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide/latest/app-managing-power-events.html#vault
