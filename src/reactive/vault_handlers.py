@@ -798,7 +798,7 @@ def _assess_status():
 
     lb_provider = endpoint_from_name('lb-provider')
     is_leader = is_flag_set('leadership.is_leader')
-    if is_leader and lb_provider.is_available:
+    if is_leader and lb_provider and lb_provider.is_available:
         if not lb_provider.has_response:
             status_set('waiting', 'Waiting for load balancer')
             return
