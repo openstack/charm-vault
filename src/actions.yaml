@@ -128,13 +128,18 @@ get-root-ca:
   description: Get the root CA certificate
 disable-pki:
   description: >-
-    Disable the PKI secrets backend.  This is needed if you wish to switch the CA type
-    after being set up via either upload-signed-csr or generate-root-ca.
+    Disable the PKI secrets backend. This is needed if you wish to switch the
+    CA type after being set up via either upload-signed-csr or
+    generate-root-ca.
 pause:
-  description: Pause the vault unit.
+  description: Pause the vault unit. This stops the vault service.
 resume:
-  description: Resume the vault unit.
+  description: >-
+    Resume the vault unit. This starts the vault service. Vault will become
+    sealed.
 restart:
-  description: Restarts the vault unit.
+  description: Restarts the vault unit. Vault will become sealed.
 reload:
-  description: Reloads the vault unit.
+  description: >-
+    Reloads the vault unit. This allows for limited configuration options to be
+    re-read. Vault will not become sealed.
