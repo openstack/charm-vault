@@ -443,3 +443,18 @@ def vault_ready_for_clients():
         return True
     else:
         return False
+
+
+def get_log_level():
+    """Get the desired log-level."""
+    valid_values = ['trace', 'debug', 'info', 'warn', 'err']
+    requested_level = hookenv.config('log-level')
+    if requested_level in valid_values:
+        return requested_level
+    hookenv.log(
+        "Unable to parse log-level: {}. Setting to 'info' by default.".format(
+            requested_level
+        ),
+        level=hookenv.WARNING,
+    )
+    return 'info'

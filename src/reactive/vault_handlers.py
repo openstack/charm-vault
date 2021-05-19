@@ -200,6 +200,8 @@ def configure_vault(context):
 
     context['ssl_available'] = is_state('vault.ssl.available')
 
+    context['log_level'] = vault.get_log_level()
+
     if is_flag_set('etcd.tls.available'):
         etcd = endpoint_from_flag('etcd.available')
         log("Etcd detected, adding to context", level=DEBUG)

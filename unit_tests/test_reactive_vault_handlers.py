@@ -97,9 +97,11 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             'ssl-cert': 'acert',
             'ssl-key': 'akey'}))
 
+    @patch.object(handlers.vault, 'get_log_level')
     @patch.object(handlers.vault, 'can_restart')
-    def test_configure_vault(self, can_restart):
+    def test_configure_vault(self, can_restart, get_log_level):
         can_restart.return_value = True
+        get_log_level.return_value = 'info'
         self.config.return_value = False
         self.is_state.return_value = True
         db_context = {
@@ -113,6 +115,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             'psql_db_conn': 'myuri',
             'disable_mlock': False,
             'ssl_available': True,
+            'log_level': 'info',
         }
         render_calls = [
             mock.call(
@@ -285,15 +288,17 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         ])
 
     @patch.object(handlers, 'save_etcd_client_credentials')
+    @patch.object(handlers.vault, 'get_log_level')
     @patch.object(handlers.vault, 'get_cluster_url')
     @patch.object(handlers.vault, 'can_restart')
     @patch.object(handlers.vault, 'get_api_url')
     def test_configure_vault_etcd(self, get_api_url, can_restart,
-                                  get_cluster_url,
+                                  get_cluster_url, get_log_level,
                                   save_etcd_client_credentials):
         can_restart.return_value = True
         get_api_url.return_value = 'http://this-unit:8200'
         get_cluster_url.return_value = 'http://this-unit:8201'
+        get_log_level.return_value = 'info'
         self.config.return_value = False
         etcd_mock = mock.MagicMock()
         etcd_mock.connection_string.return_value = 'http://etcd'
@@ -309,7 +314,8 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             'etcd_tls_cert_file': '/var/snap/vault/common/etcd-cert.pem',
             'etcd_tls_key_file': '/var/snap/vault/common/etcd.key',
             'api_addr': 'http://this-unit:8200',
-            'cluster_addr': 'http://this-unit:8201'}
+            'cluster_addr': 'http://this-unit:8201',
+            'log_level': 'info'}
         render_calls = [
             mock.call(
                 'vault.hcl.j2',

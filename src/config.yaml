@@ -102,3 +102,8 @@ options:
     default: '8759h'
     description: >-
       Default TTL to use when generating certs.
+  log-level:
+    type: string
+    default: 'info'
+    description: >-
+      Log level for the vault server. Supported values (in order of detail) are trace, debug, info, warn, and err.
