@@ -1154,3 +1154,30 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         self.status_set.assert_called_with(
             'blocked', 'Load balancer failed: just because'
         )
+
+    @patch.object(handlers.vault, 'get_local_client')
+    @patch.object(handlers, 'leader_get')
+    @patch.object(handlers, 'client_approle_authorized')
+    @patch.object(handlers, '_assess_interface_groups')
+    @patch.object(handlers.vault, 'get_vault_health')
+    def test_assess_status_non_ha(self,
+                                  get_vault_health,
+                                  _assess_interface_groups,
+                                  _client_approle_authorized,
+                                  _leader_get,
+                                  get_local_client):
+        get_vault_health.return_value = self._health_response
+        self.snap.get_installed_version.return_value = '0.9.0'
+        self.endpoint_from_name().is_available = True
+        self.endpoint_from_name().has_response = False
+        self.is_flag_set.side_effect = lambda f: False
+        get_local_client.return_value.ha_status = {'ha_enabled': False}
+        handlers._assess_status()
+        self.assertIn('Unit is ready', self.status_set.call_args[0][1])
+        self.is_flag_set.side_effect = lambda f: f == 'etcd.tls.available'
+        handlers._assess_status()
+        self.assertIn('Vault running as non-HA',
+                      self.status_set.call_args[0][1])
+        get_local_client.return_value.ha_status = {'ha_enabled': True}
+        handlers._assess_status()
+        self.assertIn('Unit is ready', self.status_set.call_args[0][1])

@@ -838,6 +838,15 @@ def _assess_status():
             'to restart the service.')
         return
 
+    if is_flag_set('etcd.tls.available'):
+        client = vault.get_local_client()
+        if not client.ha_status['ha_enabled']:
+            status_set(
+                'active',
+                'Vault running as non-HA, manual intervention required '
+                'to restart the service.')
+            return
+
     status_set(
         'active',
         'Unit is ready '
@@ -856,10 +865,11 @@ def client_approle_authorized():
         vault.get_local_client()
         return True
     except (vault.hvac.exceptions.InternalServerError,
+            vault.hvac.exceptions.InvalidRequest,
             vault.VaultNotReady,
             vault.hvac.exceptions.VaultDown,
             vault.requests.exceptions.ReadTimeout):
-        log("InternalServerError: Unable to athorize approle. "
+        log("InternalServerError: Unable to authorize approle. "
             "This may indicate failure to communicate with the database ",
             "WARNING")
         log(traceback.format_exc(), level=ERROR)
