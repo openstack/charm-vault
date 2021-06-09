@@ -14,12 +14,11 @@ services:
   easyrsa:
     charm: cs:~containers/easyrsa
     num_units: 1
+    series: bionic
   etcd:
-    # NOTE(ajkavanagh) using pinned etcd to work around
-    # https://bugs.launchpad.net/charm-etcd/+bug/1861483
-    #charm: cs:etcd
-    charm: cs:~containers/etcd-474
+    charm: cs:etcd
     num_units: 3
+    series: bionic
     options:
       channel: 3.1/stable
 relations:
