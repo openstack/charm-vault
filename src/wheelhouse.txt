@@ -1,9 +1,13 @@
 netifaces
 hvac<0.7.0
-tenacity
+# for xenial support, tenacity 8.0.0+ drops support for py35
+tenacity<8.0.0
 pbr
-psycopg2
-requests
+# for xenial support, psycopg 2.9.0 drops support for py35
+psycopg2<2.9.0
+# for xenial support, requests 2.26.0 drops support for py35
+requests<2.26.0
+
 
 psutil
 
