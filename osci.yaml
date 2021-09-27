@@ -11,6 +11,8 @@
       - focal-mysql8
       - groovy-mysql8
       - hirsute-mysql8
+      - impish-mysql8:
+          voting: false
     vars:
       needs_charm_build: true
       charm_build_name: vault
@@ -69,3 +71,9 @@
     dependencies: *smoke-jobs
     vars:
       tox_extra_args: hirsute-mysql8
+- job:
+    name: impish-mysql8
+    parent: func-target
+    dependencies: *smoke-jobs
+    vars:
+      tox_extra_args: impish-mysql8

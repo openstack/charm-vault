@@ -6,6 +6,7 @@ configure:
 dev_bundles:
 - bionic
 - hirsute-mysql8
+- impish-mysql8
 
 gate_bundles:
 - xenial-ha-mysql
@@ -45,4 +46,4 @@ tests:
 
 tests_options:
   force_deploy:
-    - hirsute-mysql8
+    - impish-mysql8
