@@ -7,10 +7,12 @@ services:
     options:
         vip: 'ADD YOUR VIP HERE'
   hacluster:
-    charm: cs:~openstack-charmers-next/hacluster
+    charm: cs:~openstack-charmers/hacluster
+    channel: candidate
   mysql:
-    charm: cs:~openstack-charmers-next/percona-cluster
+    charm: cs:~openstack-charmers/percona-cluster
     num_units: 1
+    channel: candidate
   easyrsa:
     charm: cs:~containers/easyrsa
     num_units: 1
