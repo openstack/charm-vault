@@ -25,10 +25,8 @@ applications:
 
   keystone-mysql-router:
     charm: cs:~openstack-charmers/mysql-router
-    channel: candidate
   vault-mysql-router:
     charm: cs:~openstack-charmers/mysql-router
-    channel: candidate
 
   mysql-innodb-cluster:
     charm: cs:~openstack-charmers/mysql-innodb-cluster
@@ -39,7 +37,6 @@ applications:
       - '0'
       - '1'
       - '2'
-    channel: candidate
 
   vault:
     num_units: 1
@@ -55,7 +52,6 @@ applications:
       openstack-origin: *openstack-origin
     to:
       - '4'
-    channel: candidate
 
   ceph-mon:
     charm: cs:~openstack-charmers/ceph-mon
@@ -66,7 +62,6 @@ applications:
       - '5'
       - '6'
       - '7'
-    channel: candidate
 
   ceph-osd:
     charm: cs:~openstack-charmers/ceph-osd
@@ -81,7 +76,6 @@ applications:
       - '8'
       - '9'
       - '10'
-    channel: candidate
 
 relations:
   - - 'vault:shared-db'

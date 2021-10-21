@@ -7,20 +7,17 @@ services:
   mysql:
     charm: cs:~openstack-charmers/percona-cluster
     num_units: 1
-    channel: candidate
   keystone:
     charm: cs:~openstack-charmers/keystone
     num_units: 1
     options:
       admin-password: openstack
       openstack-origin: cloud:bionic-train
-    channel: candidate
   ceph-mon:
     charm: cs:~openstack-charmers/ceph-mon
     num_units: 3
     options:
       source: cloud:bionic-train
-    channel: candidate
   ceph-osd:
     charm: cs:~openstack-charmers/ceph-osd
     num_units: 3
@@ -30,7 +27,6 @@ services:
       osd-encrypt-keymanager: vault
     storage:
       osd-devices: 10G,2
-    channel: candidate
 relations:
 - - vault:shared-db
   - mysql:shared-db
