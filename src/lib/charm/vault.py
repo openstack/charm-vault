@@ -127,6 +127,8 @@ def binding_address(binding):
 def get_vault_url(binding, port, address=None):
     protocol = 'http'
     ip = address or binding_address(binding)
+    if ':' in ip:
+        ip = '[{}]'.format(ip)
     if charms.reactive.is_state('vault.ssl.available'):
         protocol = 'https'
     return '{}://{}:{}'.format(protocol, ip, port)
@@ -165,6 +167,8 @@ def get_access_address():
     addr = hookenv.config('dns-ha-access-record')
     addr = addr or get_vip('access')
     addr = addr or binding_address('access')
+    if ':' in addr:
+        addr = '[{}]'.format(addr)
     if charms.reactive.is_state('vault.ssl.available'):
         protocol = 'https'
     return '{}://{}:{}'.format(protocol, addr, 8200)
