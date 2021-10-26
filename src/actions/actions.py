@@ -193,6 +193,32 @@ def reload(args):
     host.service_reload(service_name='vault')
 
 
+def generate_cert(*args):
+    """Generates a certificate and sets it in the action output.
+
+    The certificate parameters are provided via the action parameters from
+    the user. If the current unit is not the leader or the vault calls fail,
+    this will result in a failed command.
+    """
+
+    if not hookenv.is_leader():
+        hookenv.action_fail('Please run action on lead unit')
+        return
+
+    action_config = hookenv.action_get()
+    sans_list = action_config.get('sans')
+    try:
+        new_crt = vault_pki.generate_certificate(
+            cert_type='server',
+            common_name=action_config.get('common-name'),
+            sans=list(sans_list.split()),
+            ttl=action_config.get('ttl'),
+            max_ttl=action_config.get('max-ttl'))
+        hookenv.action_set({'output': new_crt})
+    except vault.VaultError as e:
+        hookenv.action_fail(str(e))
+
+
 # Actions to function mapping, to allow for illegal python action names that
 # can map to a python function.
 ACTIONS = {
@@ -207,7 +233,8 @@ ACTIONS = {
     "pause": pause,
     "resume": resume,
     "restart": restart,
-    "reload": reload
+    "reload": reload,
+    "generate-certificate": generate_cert
 }
 
 
