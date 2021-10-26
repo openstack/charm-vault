@@ -143,3 +143,25 @@ reload:
   description: >-
     Reloads the vault unit. This allows for limited configuration options to be
     re-read. Vault will not become sealed.
+generate-certificate:
+  description: Generate a certificate agains the Vault PKI
+  properties:
+    ttl:
+      type: string
+      default: 87599h
+      description: >-
+        Specifies the Time To Live for the certificate
+    common-name:
+      type: string
+      description: >-
+        CN field of the new certificate
+    sans:
+      type: string
+      description: >-
+        Space delimited list of Subject Altername Name/IP addresse(s)
+    max-ttl:
+      type: string
+      default: 8760h
+      description: >-
+        Specifies the maximum Time To Live for generated certificates.
+
