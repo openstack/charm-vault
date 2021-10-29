@@ -3,15 +3,13 @@
       - charm-unit-jobs
     check:
       jobs:
-      - xenial-ha-mysql
-      - xenial-postgres
-      - xenial-mysql
       - bionic-postgres
       - bionic-mysql
       - focal-mysql8
-      - groovy-mysql8
       - hirsute-mysql8
       - impish-mysql8:
+          voting: false
+      - jammy-mysql8:
           voting: false
     vars:
       needs_charm_build: true
@@ -29,28 +27,10 @@
     vars:
       tox_extra_args: bionic-mysql
 - job:
-    name: xenial-ha-mysql
+    name: bionic-postgres
     parent: func-target
     dependencies: &smoke-jobs
       - bionic-mysql
-    vars:
-      tox_extra_args: xenial-ha-mysql
-- job:
-    name: xenial-postgres
-    parent: func-target
-    dependencies: *smoke-jobs
-    vars:
-      tox_extra_args: xenial-postgres
-- job:
-    name: xenial-mysql
-    parent: func-target
-    dependencies: *smoke-jobs
-    vars:
-      tox_extra_args: xenial-mysql
-- job:
-    name: bionic-postgres
-    parent: func-target
-    dependencies: *smoke-jobs
     vars:
       tox_extra_args: bionic-postgres
 - job:
@@ -59,12 +39,6 @@
     dependencies: *smoke-jobs
     vars:
       tox_extra_args: focal-mysql8
-- job:
-    name: groovy-mysql8
-    parent: func-target
-    dependencies: *smoke-jobs
-    vars:
-      tox_extra_args: groovy-mysql8
 - job:
     name: hirsute-mysql8
     parent: func-target
@@ -77,3 +51,9 @@
     dependencies: *smoke-jobs
     vars:
       tox_extra_args: impish-mysql8
+- job:
+    name: jammy-mysql8
+    parent: func-target
+    dependencies: *smoke-jobs
+    vars:
+      tox_extra_args: jammy-mysql8

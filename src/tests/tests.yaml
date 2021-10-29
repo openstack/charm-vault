@@ -3,19 +3,15 @@ charm_name: vault
 configure:
 - zaza.openstack.charm_tests.vault.setup.basic_setup
 
-dev_bundles:
-- bionic
-- hirsute-mysql8
-- impish-mysql8
-
 gate_bundles:
-- xenial-ha-mysql
-- xenial-postgres
-- xenial-mysql
 - bionic-postgres
 - bionic-mysql
 - focal-mysql8
-- groovy-mysql8
+- hirsute-mysql8
+- impish-mysql8
+
+dev_bundles:
+- jammy-mysql8
 
 smoke_bundles:
 - focal-mysql8
@@ -46,4 +42,6 @@ tests:
 
 tests_options:
   force_deploy:
+    - hirsute-mysql8
     - impish-mysql8
+    - jammy-mysql8
