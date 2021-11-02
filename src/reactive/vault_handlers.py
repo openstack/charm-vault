@@ -817,6 +817,11 @@ def _assess_status():
         status_set('blocked', 'Missing CA cert')
         return
 
+    has_certs_relation = is_flag_set('certificates.available')
+    if is_leader and has_certs_relation and not has_ca:
+        status_set('blocked', 'Missing CA cert')
+        return
+
     _assess_interface_groups(OPTIONAL_INTERFACES, optional=True,
                              missing_interfaces=_missing_interfaces,
                              incomplete_interfaces=_incomplete_interfaces)

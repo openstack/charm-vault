@@ -483,6 +483,24 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         handlers._assess_status()
         self.status_set.assert_called_with('blocked', 'Missing CA cert')
 
+    @patch.object(handlers, 'leader_get')
+    @patch.object(handlers, 'client_approle_authorized')
+    @patch.object(handlers, '_assess_interface_groups')
+    @patch.object(handlers.vault, 'get_vault_health')
+    def test_assess_status_missing_ca_certs_available(
+            self, get_vault_health,
+            _assess_interface_groups,
+            _client_approle_authorized,
+            _leader_get):
+        flags = ['certificates.available']
+        self.is_flag_set.side_effect = lambda f: f in flags
+        get_vault_health.return_value = self._health_response
+        handlers._assess_status()
+        self.status_set.assert_called_with('active', mock.ANY)
+        flags.append('leadership.is_leader')
+        handlers._assess_status()
+        self.status_set.assert_called_with('blocked', 'Missing CA cert')
+
     def test_assess_interface_groups(self):
         flags = {
             'db.master.available': True,
