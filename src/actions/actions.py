@@ -138,6 +138,7 @@ def disable_pki(*args):
     vault_pki.disable_pki_backend()
     clear_flag('charm.vault.ca.ready')
     clear_flag('pki.backend.tuned')
+    hookenv.leader_set({'root-ca': None})
 
 
 def reissue_certificates(*args):
