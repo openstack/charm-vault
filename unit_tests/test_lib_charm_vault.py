@@ -85,10 +85,26 @@ class TestLibCharmVault(unit_tests.test_utils.CharmTestCase):
 
     @patch.object(vault.hookenv, 'network_get_primary_address')
     @patch.object(vault.charms.reactive, 'is_state')
+    def test_get_api_url_sslv6(self, is_state, network_get_primary_address):
+        is_state.return_value = True
+        network_get_primary_address.return_value = '2001:db8::'
+        self.assertEqual(vault.get_api_url(), 'https://[2001:db8::]:8200')
+        network_get_primary_address.assert_called_with('access')
+
+    @patch.object(vault.hookenv, 'network_get_primary_address')
+    @patch.object(vault.charms.reactive, 'is_state')
     def test_get_api_url_nossl(self, is_state, network_get_primary_address):
         is_state.return_value = False
         network_get_primary_address.return_value = '1.2.3.4'
         self.assertEqual(vault.get_api_url(), 'http://1.2.3.4:8200')
+        network_get_primary_address.assert_called_with('access')
+
+    @patch.object(vault.hookenv, 'network_get_primary_address')
+    @patch.object(vault.charms.reactive, 'is_state')
+    def test_get_api_url_nosslv6(self, is_state, network_get_primary_address):
+        is_state.return_value = False
+        network_get_primary_address.return_value = '2001:db8::'
+        self.assertEqual(vault.get_api_url(), 'http://[2001:db8::]:8200')
         network_get_primary_address.assert_called_with('access')
 
     @patch.object(vault.hookenv, 'network_get_primary_address')
@@ -101,11 +117,31 @@ class TestLibCharmVault(unit_tests.test_utils.CharmTestCase):
 
     @patch.object(vault.hookenv, 'network_get_primary_address')
     @patch.object(vault.charms.reactive, 'is_state')
+    def test_get_cluster_url_sslv6(
+        self, is_state, network_get_primary_address
+    ):
+        is_state.return_value = True
+        network_get_primary_address.return_value = '2001:db8::'
+        self.assertEqual(vault.get_cluster_url(), 'https://[2001:db8::]:8201')
+        network_get_primary_address.assert_called_with('cluster')
+
+    @patch.object(vault.hookenv, 'network_get_primary_address')
+    @patch.object(vault.charms.reactive, 'is_state')
     def test_get_cluster_url_nossl(self, is_state,
                                    network_get_primary_address):
         is_state.return_value = False
         network_get_primary_address.return_value = '1.2.3.4'
         self.assertEqual(vault.get_cluster_url(), 'http://1.2.3.4:8201')
+        network_get_primary_address.assert_called_with('cluster')
+
+    @patch.object(vault.hookenv, 'network_get_primary_address')
+    @patch.object(vault.charms.reactive, 'is_state')
+    def test_get_cluster_url_nosslv6(
+        self, is_state, network_get_primary_address
+    ):
+        is_state.return_value = False
+        network_get_primary_address.return_value = '2001:db8::'
+        self.assertEqual(vault.get_cluster_url(), 'http://[2001:db8::]:8201')
         network_get_primary_address.assert_called_with('cluster')
 
     @patch.object(vault.hvac, 'Client')

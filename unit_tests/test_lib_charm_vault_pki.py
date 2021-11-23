@@ -147,7 +147,7 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
         get_local_client.return_value = client_mock
         is_ca_ready.return_value = False
         with self.assertRaises(vault_pki.vault.VaultNotReady):
-            vault_pki.generate_certificate('server', 'exmaple.com', [],
+            vault_pki.generate_certificate('server', 'example.com', [],
                                            ttl='3456h', max_ttl='3456h')
 
     @patch.object(vault_pki, 'is_ca_ready')
@@ -160,7 +160,7 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
         get_local_client.return_value = client_mock
         is_ca_ready.return_value = True
         with self.assertRaises(vault_pki.vault.VaultInvalidRequest):
-            vault_pki.generate_certificate('unknown', 'exmaple.com', [],
+            vault_pki.generate_certificate('unknown', 'example.com', [],
                                            '3456h', '3456h')
 
     @patch.object(vault_pki, 'is_ca_ready')
@@ -174,7 +174,7 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
         is_ca_ready.return_value = True
         client_mock.write.side_effect = hvac.exceptions.InvalidRequest
         with self.assertRaises(vault_pki.vault.VaultInvalidRequest):
-            vault_pki.generate_certificate('server', 'exmaple.com', [],
+            vault_pki.generate_certificate('server', 'example.com', [],
                                            ttl='3456h', max_ttl='3456h')
 
     @patch.object(vault_pki, 'configure_pki_backend')
@@ -234,7 +234,7 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
                 crl_distribution_points='{}/crl'.format(local_url)),
             mock.call(
                 'charm-pki-local/roles/local',
-                allowed_domains='exmaple.com',
+                allowed_domains='example.com',
                 allow_subdomains=True,
                 enforce_hostnames=False,
                 allow_any_name=True,
@@ -243,7 +243,7 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
                 client_flag=True),
             mock.call(
                 'charm-pki-local/roles/local-client',
-                allowed_domains='exmaple.com',
+                allowed_domains='example.com',
                 allow_subdomains=True,
                 enforce_hostnames=False,
                 allow_any_name=True,
@@ -251,7 +251,85 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
                 server_flag=False,
                 client_flag=True),
         ]
-        vault_pki.upload_signed_csr('MYPEM', 'exmaple.com')
+        vault_pki.upload_signed_csr('MYPEM', 'example.com')
+        client_mock._post.assert_called_once_with(
+            'v1/charm-pki-local/intermediate/set-signed',
+            json={'certificate': 'MYPEM'})
+        client_mock.write.assert_has_calls(write_calls)
+
+    @patch.object(vault_pki.vault, 'get_access_address')
+    @patch.object(vault_pki.vault, 'get_local_client')
+    def test_upload_signed_csr_ipv4(
+        self, get_local_client, get_access_address
+    ):
+        get_access_address.return_value = 'https://127.0.0.1:8200'
+        client_mock = mock.MagicMock()
+        get_local_client.return_value = client_mock
+        local_url = 'https://127.0.0.1:8200/v1/charm-pki-local'
+        write_calls = [
+            mock.call(
+                'charm-pki-local/config/urls',
+                issuing_certificates='{}/ca'.format(local_url),
+                crl_distribution_points='{}/crl'.format(local_url)),
+            mock.call(
+                'charm-pki-local/roles/local',
+                allowed_domains='example.com',
+                allow_subdomains=True,
+                enforce_hostnames=False,
+                allow_any_name=True,
+                max_ttl='87598h',
+                server_flag=True,
+                client_flag=True),
+            mock.call(
+                'charm-pki-local/roles/local-client',
+                allowed_domains='example.com',
+                allow_subdomains=True,
+                enforce_hostnames=False,
+                allow_any_name=True,
+                max_ttl='87598h',
+                server_flag=False,
+                client_flag=True),
+        ]
+        vault_pki.upload_signed_csr('MYPEM', 'example.com')
+        client_mock._post.assert_called_once_with(
+            'v1/charm-pki-local/intermediate/set-signed',
+            json={'certificate': 'MYPEM'})
+        client_mock.write.assert_has_calls(write_calls)
+
+    @patch.object(vault_pki.vault, 'get_access_address')
+    @patch.object(vault_pki.vault, 'get_local_client')
+    def test_upload_signed_csr_ipv6(
+        self, get_local_client, get_access_address
+    ):
+        get_access_address.return_value = 'https://[::1]:8200'
+        client_mock = mock.MagicMock()
+        get_local_client.return_value = client_mock
+        local_url = 'https://[::1]:8200/v1/charm-pki-local'
+        write_calls = [
+            mock.call(
+                'charm-pki-local/config/urls',
+                issuing_certificates='{}/ca'.format(local_url),
+                crl_distribution_points='{}/crl'.format(local_url)),
+            mock.call(
+                'charm-pki-local/roles/local',
+                allowed_domains='example.com',
+                allow_subdomains=True,
+                enforce_hostnames=False,
+                allow_any_name=True,
+                max_ttl='87598h',
+                server_flag=True,
+                client_flag=True),
+            mock.call(
+                'charm-pki-local/roles/local-client',
+                allowed_domains='example.com',
+                allow_subdomains=True,
+                enforce_hostnames=False,
+                allow_any_name=True,
+                max_ttl='87598h',
+                server_flag=False,
+                client_flag=True),
+        ]
+        vault_pki.upload_signed_csr('MYPEM', 'example.com')
         client_mock._post.assert_called_once_with(
             'v1/charm-pki-local/intermediate/set-signed',
             json={'certificate': 'MYPEM'})
@@ -272,7 +350,7 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
                 crl_distribution_points='{}/crl'.format(local_url)),
             mock.call(
                 'charm-pki-local/roles/local',
-                allowed_domains='exmaple.com',
+                allowed_domains='example.com',
                 allow_subdomains=False,
                 enforce_hostnames=True,
                 allow_any_name=False,
@@ -281,7 +359,7 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
                 client_flag=True),
             mock.call(
                 'charm-pki-local/roles/local-client',
-                allowed_domains='exmaple.com',
+                allowed_domains='example.com',
                 allow_subdomains=False,
                 enforce_hostnames=True,
                 allow_any_name=False,
@@ -291,7 +369,7 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
         ]
         vault_pki.upload_signed_csr(
             'MYPEM',
-            'exmaple.com',
+            'example.com',
             allow_subdomains=False,
             enforce_hostnames=True,
             allow_any_name=False,
