@@ -419,6 +419,7 @@ def nagios_servicegroups_changed():
 def cluster_connected(hacluster):
     """Configure HA resources in corosync"""
     dns_record = config('dns-ha-access-record')
+    cfg = config()
     vips = config('vip') or None
     if vips and dns_record:
         set_flag('config.dns_vip.invalid')
@@ -430,6 +431,17 @@ def cluster_connected(hacluster):
 
     if vips:
         vips = vips.split()
+
+        # the `vip` config option has changed and there was a value previously
+        # set, the principle needs to ask hacluster to remove it from
+        # pacemaker's configuration (LP: #1952363).
+        if cfg.changed('vip') and cfg.previous('vip'):
+            old_vips = cfg.previous('vip').split()
+            vips_to_del = set(old_vips) - set(vips)
+            for vip in vips_to_del:
+                log("Registering %s for deletion" % vip)
+                hacluster.remove_vip('vault', vip)
+
         for vip in vips:
             if vip == vault.get_vip(binding='external'):
                 hacluster.add_vip('vault-ext', vip)
