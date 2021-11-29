@@ -82,6 +82,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         self.endpoint_from_name().is_available = False
         self.endpoint_from_name().has_response = False
         self.patch_object(handlers.vault.hookenv, 'charm_dir', 'src')
+        self.test_config = unit_tests.test_utils.TestConfig()
 
     def test_ssl_available(self):
         self.assertFalse(handlers.ssl_available({
@@ -592,19 +593,32 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
 
     @mock.patch.object(handlers.vault, 'get_vip')
     def test_cluster_connected_vip(self, mock_get_vip):
-        charm_config = {
-            'vip': '10.1.1.1'}
-        self.config.side_effect = lambda x: charm_config.get(x)
+        self.test_config.set('vip', '10.1.1.1')
+        self.config.side_effect = self.test_config
         hacluster_mock = mock.MagicMock()
         handlers.cluster_connected(hacluster_mock)
         hacluster_mock.add_vip.assert_called_once_with('vault', '10.1.1.1')
         hacluster_mock.bind_resources.assert_called_once_with()
         self.clear_flag.assert_called_once_with('config.dns_vip.invalid')
 
+    @mock.patch.object(handlers.vault, 'get_vip')
+    def test_cluster_connected_vip_changed(self, mock_get_vip):
+        self.test_config.set('vip', '10.1.1.1 20.1.1.1')
+        self.test_config.set_previous('vip', '10.1.1.1 30.1.1.1')
+        self.config.side_effect = self.test_config
+        hacluster_mock = mock.MagicMock()
+        handlers.cluster_connected(hacluster_mock)
+        hacluster_mock.remove_vip.assert_called_once_with('vault', '30.1.1.1')
+        hacluster_mock.add_vip.assert_has_calls(
+            [mock.call('vault', '10.1.1.1'),
+             mock.call('vault', '20.1.1.1')]
+        )
+        hacluster_mock.bind_resources.assert_called_once_with()
+        self.clear_flag.assert_called_once_with('config.dns_vip.invalid')
+
     def test_cluster_connected_dnsha(self):
-        charm_config = {
-            'dns-ha-access-record': 'myrecord.mycopany.co.uk'}
-        self.config.side_effect = lambda x: charm_config.get(x)
+        self.test_config.set('dns-ha-access-record', 'myrecord.mycopany.co.uk')
+        self.config.side_effect = self.test_config
         self.network_get_primary_address.return_value = '10.1.100.1'
         hacluster_mock = mock.MagicMock()
         handlers.cluster_connected(hacluster_mock)
@@ -614,10 +628,9 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         self.clear_flag.assert_called_once_with('config.dns_vip.invalid')
 
     def test_cluster_connected_vip_and_dnsha(self):
-        charm_config = {
-            'vip': '10.1.1.1',
-            'dns-ha-access-record': 'myrecord.mycopany.co.uk'}
-        self.config.side_effect = lambda x: charm_config.get(x)
+        self.test_config.set('vip', '10.1.1.1')
+        self.test_config.set('dns-ha-access-record', 'myrecord.mycopany.co.uk')
+        self.config.side_effect = self.test_config
         self.network_get_primary_address.return_value = '10.1.100.1'
         hacluster_mock = mock.MagicMock()
         handlers.cluster_connected(hacluster_mock)
