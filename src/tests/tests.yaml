@@ -4,10 +4,7 @@ configure:
 - zaza.openstack.charm_tests.vault.setup.basic_setup
 
 gate_bundles:
-- bionic-postgres
-- bionic-mysql
 - focal-mysql8
-- hirsute-mysql8
 - impish-mysql8
 
 dev_bundles:
@@ -42,6 +39,5 @@ tests:
 
 tests_options:
   force_deploy:
-    - hirsute-mysql8
     - impish-mysql8
     - jammy-mysql8

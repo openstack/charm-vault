@@ -1,12 +1,10 @@
 - project:
     templates:
-      - charm-yoga-unit-jobs
+      - charm-unit-jobs-py38
+      - charm-unit-jobs-py39
     check:
       jobs:
-      - bionic-postgres
-      - bionic-mysql
       - focal-mysql8
-      - hirsute-mysql8
       - impish-mysql8:
           voting: false
       - jammy-mysql8:
@@ -16,43 +14,26 @@
       charm_build_name: vault
 
 - job:
-    name: bionic-mysql
+    name: focal-mysql8
     parent: func-target
     dependencies:
       - osci-lint
-      - tox-py36
       - tox-py38
       - tox-py39
-    vars:
-      tox_extra_args: bionic-mysql
-- job:
-    name: bionic-postgres
-    parent: func-target
-    dependencies: &smoke-jobs
-      - bionic-mysql
-    vars:
-      tox_extra_args: bionic-postgres
-- job:
-    name: focal-mysql8
-    parent: func-target
-    dependencies: *smoke-jobs
+      - charm-build
     vars:
       tox_extra_args: focal-mysql8
 - job:
-    name: hirsute-mysql8
-    parent: func-target
-    dependencies: *smoke-jobs
-    vars:
-      tox_extra_args: hirsute-mysql8
-- job:
     name: impish-mysql8
     parent: func-target
-    dependencies: *smoke-jobs
+    dependencies:
+      - focal-mysql8
     vars:
       tox_extra_args: impish-mysql8
 - job:
     name: jammy-mysql8
     parent: func-target
-    dependencies: *smoke-jobs
+    dependencies:
+      - focal-mysql8
     vars:
       tox_extra_args: jammy-mysql8

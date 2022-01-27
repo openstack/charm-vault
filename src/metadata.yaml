@@ -12,10 +12,7 @@ description: |
   credentials, SQL/NoSQL databases, X.509 certificates,
   SSH credentials, and more.
 series:
-- bionic
 - focal
-- groovy
-- hirsute
 - impish
 tags:
 - security
