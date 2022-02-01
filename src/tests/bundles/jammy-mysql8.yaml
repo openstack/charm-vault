@@ -1,6 +1,8 @@
 variables:
   openstack-origin: &openstack-origin distro
 
+local_overlay_enabled: False
+
 series: jammy
 
 comment:
@@ -43,7 +45,7 @@ applications:
 
   vault:
     num_units: 1
-    charm: vault
+    charm: ../../../vault.charm
     to:
       - '3'
 

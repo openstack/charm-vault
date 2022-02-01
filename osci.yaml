@@ -12,6 +12,7 @@
     vars:
       needs_charm_build: true
       charm_build_name: vault
+      build_type: charmcraft
 
 - job:
     name: focal-mysql8
