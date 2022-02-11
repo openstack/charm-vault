@@ -31,10 +31,7 @@ target_deploy_status:
 
 tests:
 - zaza.openstack.charm_tests.vault.tests.VaultTest
-# This second run of the tests is to ensure that Vault can handle updating the
-# root CA in Vault with a refreshed CSR and won't end up in a hook-error
-# state. (LP: #1866150).
-- zaza.openstack.charm_tests.vault.tests.VaultTest
+- zaza.openstack.charm_tests.vault.tests.VaultCacheTest
 
 tests_options:
   force_deploy:
