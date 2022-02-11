@@ -276,6 +276,12 @@
     },
     {
       "type": "python_module",
+      "package": "charms.reactive",
+      "vcs": null,
+      "version": "1.5.2"
+    },
+    {
+      "type": "python_module",
       "package": "ops_reactive_interface",
       "vcs": null,
       "version": "1.0.1"
