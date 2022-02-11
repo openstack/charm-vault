@@ -1,5 +1,5 @@
 from unittest import mock
-from unittest.mock import patch
+from unittest.mock import call, patch, MagicMock
 
 import hvac
 
@@ -12,7 +12,9 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
     def setUp(self):
         super(TestLibCharmVaultPKI, self).setUp()
         self.obj = vault_pki
-        self.patches = []
+        self.patches = [
+            'endpoint_from_name',
+        ]
         self.patch_all()
 
     @patch.object(vault_pki.vault, 'is_backend_mounted')
@@ -437,3 +439,339 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
                 server_flag=False,
                 client_flag=True),
         ])
+
+    def test_get_pki_cache(self):
+        """Test retrieving PKI from cache."""
+        expected_pki = {
+            vault_pki.TOP_LEVEL_CERT_KEY: {
+                "client_unit_0.server.cert": "cert_data",
+                "client_unit_0.server.key": "key_data",
+            }
+        }
+        cluster_relation = MagicMock()
+        self.endpoint_from_name.return_value = cluster_relation
+        cluster_relation.get_unit_pki.return_value = expected_pki
+
+        pki = vault_pki.get_pki_cache('client_unit_0')
+        cluster_relation.get_unit_pki.assert_called_once_with(
+            'pki_client_unit_0')
+        self.assertEqual(pki, expected_pki)
+
+        # test retrieval if the PKI is not set
+        cluster_relation.get_unit_pki.return_value = {}
+        cluster_relation.get_unit_pki.reset_mock()
+
+        pki = vault_pki.get_pki_cache('client_unit_0')
+        cluster_relation.get_unit_pki.assert_called_once_with(
+            'pki_client_unit_0')
+        self.assertEqual(pki, {})
+
+    @patch.object(vault_pki, 'get_pki_cache')
+    @patch.object(vault_pki, 'get_chain')
+    @patch.object(vault_pki, 'get_ca')
+    def test_find_cert_in_cache_no_ca(self, get_ca, get_chain, get_pki_cache):
+        """Test getting cert from cache when CA is missing."""
+        get_ca.return_value = None
+        get_chain.return_value = None
+
+        cert, key = vault_pki.find_cert_in_cache(MagicMock())
+
+        # assert that CA cert or chain was retrieved
+        get_ca.assert_called_once_with()
+        get_chain.assert_called_once_with()
+        # assert that function does not proceed due to the missing CA
+        get_pki_cache.assert_not_called()
+
+        self.assertIsNone(cert)
+        self.assertIsNone(key)
+
+    @patch.object(vault_pki, 'verify_cert')
+    @patch.object(vault_pki, 'get_pki_cache')
+    @patch.object(vault_pki, 'get_chain')
+    @patch.object(vault_pki, 'get_ca')
+    def test_find_cert_in_cache_missing(self, get_ca, get_chain,
+                                        get_pki_cache, verify_cache):
+        """Test use case when searched certificate is not in cache."""
+        request = MagicMock()
+        request.unit_name = "client_unit_0"
+        request._is_top_level_server_cert = True
+
+        get_ca.return_value = MagicMock()
+        get_pki_cache.return_value = {}
+
+        cert, key = vault_pki.find_cert_in_cache(request)
+
+        # assert that verification of cert is not attempted when
+        # cert is not found
+        verify_cache.assert_not_called()
+
+        self.assertIsNone(cert)
+        self.assertIsNone(key)
+
+        # Same scenario, but with non-top-level certificate
+        request._is_top_level_server_cert = False
+
+        cert, key = vault_pki.find_cert_in_cache(request)
+
+        verify_cache.assert_not_called()
+        self.assertIsNone(cert)
+        self.assertIsNone(key)
+
+    @patch.object(vault_pki, 'get_pki_cache')
+    @patch.object(vault_pki, 'get_chain')
+    @patch.object(vault_pki, 'get_ca')
+    def test_find_cert_in_cache_err(self, get_ca, get_chain, get_pki_cache):
+        """Test getting cert from cache when CA is missing."""
+        get_ca.return_value = None
+        get_chain.side_effect = hvac.exceptions.InvalidPath
+
+        cert, key = vault_pki.find_cert_in_cache(MagicMock())
+
+        # assert that CA cert or chain was retrieved
+        get_ca.assert_called_once_with()
+        get_chain.assert_called_once_with()
+        # assert that function does not proceed due to the missing CA
+        get_pki_cache.assert_not_called()
+
+        self.assertIsNone(cert)
+        self.assertIsNone(key)
+
+    @patch.object(vault_pki, 'verify_cert')
+    @patch.object(vault_pki, 'get_pki_cache')
+    @patch.object(vault_pki, 'get_chain')
+    @patch.object(vault_pki, 'get_ca')
+    def test_find_cert_in_cache_top_level(self, get_ca, get_chain,
+                                          get_pki_cache, verify_cache):
+        """Test fetching top level cert from cache.
+
+        Additional test scenario: Test that nothing is returned if cert fails
+        CA verification.
+        """
+        ca_cert = "CA cert data"
+        expected_cert = "cert data"
+        expected_key = "key data"
+        cert_name = "server.cert"
+        key_name = "server.key"
+        client_name = "client_unit_0"
+
+        # setup cert request
+        request = MagicMock()
+        request.unit_name = client_name
+        request._is_top_level_server_cert = True
+        request._server_cert_key = cert_name
+        request._server_key_key = key_name
+
+        # PKI cache content
+        pki = {
+            vault_pki.TOP_LEVEL_CERT_KEY: {
+                cert_name: expected_cert,
+                key_name: expected_key
+            }
+        }
+
+        get_ca.return_value = ca_cert
+        get_chain.return_value = ca_cert
+        get_pki_cache.return_value = pki
+        verify_cache.return_value = True
+
+        cert, key = vault_pki.find_cert_in_cache(request)
+
+        verify_cache.assert_called_once_with(ca_cert, expected_cert)
+        self.assertEqual(cert, expected_cert)
+        self.assertEqual(key, expected_key)
+
+        # Additional test: Nothing should be returned if cert failed
+        # CA verification.
+        verify_cache.reset_mock()
+        verify_cache.return_value = False
+
+        cert, key = vault_pki.find_cert_in_cache(request)
+
+        verify_cache.assert_called_once_with(ca_cert, expected_cert)
+        self.assertIsNone(cert)
+        self.assertIsNone(key)
+
+    @patch.object(vault_pki, 'verify_cert')
+    @patch.object(vault_pki, 'get_pki_cache')
+    @patch.object(vault_pki, 'get_chain')
+    @patch.object(vault_pki, 'get_ca')
+    def test_find_cert_in_cache_not_top_level(self, get_ca, get_chain,
+                                              get_pki_cache, verify_cache):
+        """Test fetching non-top level cert from cache.
+
+        Additional test scenario: Test that nothing is returned if cert fails
+        CA verification.
+        """
+        ca_cert = "CA cert data"
+        expected_cert = "cert data"
+        expected_key = "key data"
+        client_name = "client_unit_0"
+        publish_key = client_name + ".processed_client_requests"
+        common_name = "client.0"
+
+        # setup cert request
+        request = MagicMock()
+        request.unit_name = client_name
+        request._is_top_level_server_cert = False
+        request._publish_key = publish_key
+        request.common_name = common_name
+
+        # PKI cache content
+        pki = {
+            publish_key: {
+                common_name: {
+                    "cert": expected_cert,
+                    "key": expected_key,
+                }
+            }
+        }
+
+        get_ca.return_value = ca_cert
+        get_chain.return_value = ca_cert
+        get_pki_cache.return_value = pki
+        verify_cache.return_value = True
+
+        cert, key = vault_pki.find_cert_in_cache(request)
+
+        verify_cache.assert_called_once_with(ca_cert, expected_cert)
+        self.assertEqual(cert, expected_cert)
+        self.assertEqual(key, expected_key)
+
+        # Additional test: Nothing should be returned if cert failed
+        # CA verification.
+        verify_cache.reset_mock()
+        verify_cache.return_value = False
+
+        cert, key = vault_pki.find_cert_in_cache(request)
+
+        verify_cache.assert_called_once_with(ca_cert, expected_cert)
+        self.assertIsNone(cert)
+        self.assertIsNone(key)
+
+    @patch.object(vault_pki, 'get_pki_cache')
+    def test_update_cert_cache_top_level_cert(self, get_pki_cache):
+        """Test storing top-level cert in cache."""
+        cert_data = "cert data"
+        key_data = "key data"
+        cert_name = "server.cert"
+        key_name = "server.key"
+        client_name = "client_unit_0"
+
+        # setup cert request
+        request = MagicMock()
+        request.unit_name = client_name
+        request.common_name = client_name
+        request._is_top_level_server_cert = True
+        request._server_cert_key = cert_name
+        request._server_key_key = key_name
+
+        cluster_relation = MagicMock()
+        self.endpoint_from_name.return_value = cluster_relation
+
+        # PKI structure
+        initial_pki = {}
+        expected_pki = {
+            vault_pki.TOP_LEVEL_CERT_KEY: {
+                cert_name: cert_data,
+                key_name: key_data
+            }
+        }
+
+        get_pki_cache.return_value = initial_pki
+
+        vault_pki.update_cert_cache(request, cert_data, key_data)
+        key = "{}_{}".format(vault_pki.PKI_CACHE_KEY, client_name)
+        cluster_relation.set_unit_pki.assert_called_once_with(
+            key, expected_pki)
+
+    @patch.object(vault_pki, 'get_pki_cache')
+    def test_update_cert_cache_non_top_level_cert(self, get_pki_cache):
+        """Test storing non-top-level cert in cache."""
+        cert_data = "cert data"
+        key_data = "key data"
+        client_name = "client_unit_0"
+        publish_key = client_name + ".processed_client_requests"
+        common_name = "client.0"
+
+        cluster_relation = MagicMock()
+        self.endpoint_from_name.return_value = cluster_relation
+
+        # setup cert request
+        request = MagicMock()
+        request.unit_name = client_name
+        request._is_top_level_server_cert = False
+        request._publish_key = publish_key
+        request.common_name = common_name
+
+        # PKI structure
+        initial_pki = {}
+        expected_pki = {
+            publish_key: {
+                common_name: {
+                    "cert": cert_data,
+                    "key": key_data,
+                }
+            }
+        }
+
+        get_pki_cache.return_value = initial_pki
+
+        vault_pki.update_cert_cache(request, cert_data, key_data)
+        key = "{}_{}".format(vault_pki.PKI_CACHE_KEY, client_name)
+        cluster_relation.set_unit_pki.assert_called_once_with(
+            key, expected_pki)
+
+    def test_remove_unit_from_cache(self):
+        """Test removing unit certificates from cache."""
+        cluster_relation = MagicMock()
+        self.endpoint_from_name.return_value = cluster_relation
+        vault_pki.remove_unit_from_cache('client_0')
+        key = "{}_{}".format(vault_pki.PKI_CACHE_KEY, 'client_0')
+        cluster_relation.set_unit_pki.assert_called_once_with(key, None)
+
+    @patch.object(vault_pki, 'update_cert_cache')
+    def test_populate_cert_cache(self, update_cert_cache):
+        # Define data for top level certificate and key
+        top_level_cert_name = "server.crt"
+        top_level_key_name = "server.key"
+        top_level_cert_data = "top level cert"
+        top_level_key_data = "top level key"
+
+        # Define data for non-top level certificate
+        processed_request_cn = "juju_unit_service.crt"
+        processed_request_publish_key = "juju_unit_service.processed"
+        processed_cert_data = "processed cert"
+        processed_key_data = "processed key"
+
+        # Mock request for top level certificate
+        top_level_request = MagicMock()
+        top_level_request._is_top_level_server_cert = True
+        top_level_request._server_cert_key = top_level_cert_name
+        top_level_request._server_key_key = top_level_key_name
+        top_level_request._unit.relation.to_publish_raw = {
+            top_level_cert_name: top_level_cert_data,
+            top_level_key_name: top_level_key_data,
+        }
+
+        # Mock request for non-top level certificate
+        processed_request = MagicMock()
+        processed_request._is_top_level_server_cert = False
+        processed_request.common_name = processed_request_cn
+        processed_request._publish_key = processed_request_publish_key
+        processed_request._unit.relation.to_publish = {
+            processed_request_publish_key: {processed_request_cn: {
+                "cert": processed_cert_data,
+                "key": processed_key_data
+            }}
+        }
+
+        tls_endpoint = MagicMock()
+        tls_endpoint.all_requests = [top_level_request, processed_request]
+
+        vault_pki.populate_cert_cache(tls_endpoint)
+
+        expected_update_calls = [
+            call(top_level_request, top_level_cert_data, top_level_key_data),
+            call(processed_request, processed_cert_data, processed_key_data),
+        ]
+        update_cert_cache.assert_has_calls(expected_update_calls)
