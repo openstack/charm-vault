@@ -1,3 +1,8 @@
+import json
+import re
+from subprocess import check_output, CalledProcessError
+from tempfile import NamedTemporaryFile
+
 import hvac
 
 import charmhelpers.contrib.network.ip as ch_ip
@@ -370,3 +375,446 @@ def update_roles(**kwargs):
     local.update(**kwargs)
     del local['server_flag']
     write_roles(client, **local)
+
+
+def is_cert_from_vault(cert, name=None):
+    """Return True if the cert is issued by vault and not revoked.
+
+    Looking at the cert, check to see if it was issued by Vault and not on the
+    revoked list.  In order to do this, the cert must be in x509 format as
+    openssl is used to extract the ID of the cert. Then the certificate is
+    extracted from vault and the signatures compared.
+
+    :param cert: the certificate in x509 form
+    :type cert: str
+    :param name: the mount point in value, default CHARM_PKI_MP
+    :type name: str
+    :returns: True if issued by vault, False if unknown.
+    :raises VaultDown: if vault is down.
+    :raises VaultNotReady: if vault is sealed.
+    :raises VaultError: for any other vault issue.
+    """
+    # first get the ID from the client
+    serial = get_serial_number_from_cert(cert)
+    if serial is None:
+        return False
+
+    try:
+        # now get a list of serial numbers from vault.
+        client = vault.get_local_client()
+        if not name:
+            name = CHARM_PKI_MP
+        vault_certs_response = client.secrets.pki.list_certificates(
+            mount_point=name)
+        vault_certs = [k.replace('-', '').upper()
+                       for k in vault_certs_response['data']['keys']]
+
+        if serial not in vault_certs:
+            hookenv.log("Certificate with serial {} not issed by vault."
+                        .format(serial), level=hookenv.DEBUG)
+            return False
+        revoked_serials = get_revoked_serials_from_vault(name)
+        if serial in revoked_serials:
+            hookenv.log("Serial {} is revoked.".format(serial),
+                        level=hookenv.DEBUG)
+            return False
+        return True
+    except (
+        vault.hvac.exceptions.InvalidPath,
+        vault.hvac.exceptions.InternalServerError,
+        vault.hvac.exceptions.VaultDown,
+        vault.VaultNotReady,
+    ):
+        # vault is not available for some reason, return None, None as nothing
+        # else is particularly useful here.
+        return False
+    except Exception as e:
+        hookenv.log("General failure verifying cert: {}".format(str(e)),
+                    level=hookenv.DEBUG)
+        return False
+
+
+def get_serial_number_from_cert(cert, name=None):
+    """Extract the serial number from the cert, or return None.
+
+    :param cert: the certificate in x509 form
+    :type cert: str
+    :returns: the cert serial number or None.
+    :rtype: str | None
+    """
+    with NamedTemporaryFile() as f:
+        f.write(cert.encode())
+        f.flush()
+        command = ["openssl", "x509", "-in", f.name, "-noout", "-serial"]
+        try:
+            # output in form of 'serial=xxxxx'
+            output = check_output(command).decode().strip()
+            serial = output.split("=")[1]
+            return serial
+        except CalledProcessError as e:
+            hookenv.log("Couldn't process certificate: reason: {}"
+                        .format(str(e)),
+                        level=hookenv.DEBUG)
+        except (TypeError, IndexError):
+            hookenv.log(
+                "Couldn't extract serial number from passed certificate",
+                level=hookenv.DEBUG)
+    return None
+
+
+def get_revoked_serials_from_vault(name=None):
+    """Get a list of revoked serial numbers from vault.
+
+    This fetches the CRL from vault; this is in PEM format. We ought to use
+    python cryptography.x509.load_pem_x509_crl(), but adding cryptography
+    requires converting the charm to binary, and seems a lot for one function.
+
+    Thus, the format for no certificates revoked is:
+
+    .. code-block:: text
+
+       Certificate Revocation List (CRL):
+               Version 2 (0x1)
+               Signature Algorithm: sha256WithRSAEncryption
+               Issuer: CN = Vault Intermediate Certificate Authority ...
+               Last Update: Jul 17 11:58:57 2023 GMT
+               Next Update: Jul 20 11:58:57 2023 GMT
+       No Revoked Certificates.
+           Signature Algorithm: sha256WithRSAEncryption
+           Signature Value:
+               ...
+
+    And for two (and the pattern repeats):
+
+    .. code-block:: text
+
+       Certificate Revocation List (CRL):
+               Version 2 (0x1)
+               Signature Algorithm: sha256WithRSAEncryption
+               Issuer: CN = Vault Intermediate Certificate Authority ...
+               Last Update: Jul 18 11:38:17 2023 GMT
+               Next Update: Jul 21 11:38:17 2023 GMT
+       Revoked Certificates:
+           Serial Number: 6EAE52225CB7AB452F37D4FBAC127DDF9542D3DC
+               Revocation Date: Jul 18 11:38:17 2023 GMT
+           Serial Number: 78FBEEE4E419C5A335113E4F1EF41F463534B698
+               Revocation Date: Jul 18 11:33:36 2023 GMT
+           Signature Algorithm: sha256WithRSAEncryption
+           Signature Value:
+
+    Thus we just need to grep the output for "Serial Number:"
+
+    :param name: the mount point in value, default CHARM_PKI_MP
+    :type name: str
+    :returns: a list of serial numbers, uppercase, no hyphens
+    :rtype: List[str]
+    :raises VaultDown: if vault is down.
+    :raises VaultNotReady: if vault is sealed.
+    :raises VaultError: for any other vault issue.
+    :raises subprocess.CalledProcessError: if openssl command fails
+    """
+    client = vault.get_local_client()
+    revoked_certs_response = client.secrets.pki.read_crl(mount_point=name)
+    with NamedTemporaryFile() as f:
+        f.write(revoked_certs_response.encode())
+        f.flush()
+        command = ["openssl", "crl", "-in", f.name, "-noout", "-text"]
+        output = check_output(command).decode().strip()
+    pattern = re.compile(r"Serial Number: (\S+)$")
+    serials = []
+    # for line in output.split("\n"):
+    for line in output.splitlines():
+        match = pattern.match(line.strip())
+        if match:
+            serials.append(match[1])
+    return serials
+
+
+class CertCache:
+    """A class to store the cert and key for a request.
+
+    This class provides a mechanism to CRUD a cached pair of (cert, key) in
+    storage, which is as loosely coupled to leader storage as possible.
+
+    As the key and cert is stored in leader settings, it's available across the
+    units and therefore, any unit can access the key and cert for any unit that
+    is related to the application.
+
+    The actually storing of the key and cert is done in as flat a way as
+    possible in leader-settings.  This is to minimise the size of the
+    get and store operations for units that might have many certificate
+    requests.  The key and cert are stored as values to a key which is
+    constructed from the unit_name, publish_key, common_name and item.  See
+    PUBLISH_KEY_FORMAT for details.
+
+    Although, it has a dependency on the request (from tls_certificates), this
+    was deemed acceptable to keep the interface obvious and pleasing to use.
+    """
+    PUBLISH_KEY_FORMAT = "pki:{unit_name}:{publish_key}:{common_name}:{item}"
+    PUBLISH_KEY_PREFIX = "pki:{unit_name}:"
+    TOP_LEVEL_PUBLISH_KEY = "top_level_publish_key"
+
+    def __init__(self, request):
+        """Initialise a proxy for the the cert and key in leader-settings.
+
+        :param request: the request from which the cert/cache is cached.
+        :type request: tls_certificates_common.CertificateRequest
+        """
+        self._request = request
+
+    def _cache_key_for(self, item):
+        """
+        Return a cache key for the request by the item.
+
+        :param item: the item to return a key for, either 'cert' or 'key'
+        :type item: str
+        :returns: the unique key for the unit, request, and item
+        :rtype: str
+        """
+        assert item in ('cert', 'key'), "Error in argument passed"
+        if self._request._is_top_level_server_cert:
+            return self.PUBLISH_KEY_FORMAT.format(
+                unit_name=self._request.unit_name,
+                publish_key=self.TOP_LEVEL_PUBLISH_KEY,
+                common_name=self._request.common_name,
+                item=item)
+        else:
+            return self.PUBLISH_KEY_FORMAT.format(
+                unit_name=self._request.unit_name,
+                publish_key=self._request._publish_key,
+                common_name=self._request.common_name,
+                item=item)
+
+    @staticmethod
+    def _fetch(key):
+        """Fetch from the storage using a store pre key and key.
+
+        Note the _store() method dumps it as json so it is fetched as json.
+
+        :param key: the key value to fetch from leader settings
+        :type key: str
+        :returns: the value from leader settings or ""
+        :rtype: str
+        """
+        value = hookenv.leader_get(key)
+        if value:
+            return json.loads(value)
+        return ""
+
+    @staticmethod
+    def _store(key, value):
+        """Store a value by key into the actual storage.
+
+        :param key: the key value to set in leader settings
+        :type key: str
+        :param value: the value to store.
+        :type value: str
+        :raises: RuntimeError if not the leader
+        :raises: TypeError if value couldn't be converted.
+        """
+        try:
+            hookenv.leader_set({key: json.dumps(value)})
+        except TypeError:
+            raise
+        except Exception as e:
+            raise RuntimeError(str(e))
+
+    @staticmethod
+    def _clear(key):
+        """Explicitly clear a valye in the actual storage.
+
+        :param key: the key value to clear.
+        :type key: str
+        :raises: RuntimeError if not the leader
+        :raises: TypeError if value couldn't be converted.
+        """
+        try:
+            hookenv.leader_set({key: None})
+        except Exception as e:
+            raise RuntimeError(str(e))
+
+    def clear(self):
+        self._clear(self._cache_key_for('key'))
+        self._clear(self._cache_key_for('cert'))
+
+    @property
+    def key(self):
+        """Get the key."""
+        return self._fetch(self._cache_key_for('key'))
+
+    @key.setter
+    def key(self, key_value):
+        """Set the key value."""
+        self._store(self._cache_key_for('key'), key_value)
+
+    @property
+    def cert(self):
+        """The the cert."""
+        return self._fetch(self._cache_key_for('cert'))
+
+    @cert.setter
+    def cert(self, cert_value):
+        """Set the cert value."""
+        self._store(self._cache_key_for('cert'), cert_value)
+
+    @classmethod
+    def remove_all_for(cls, unit_name):
+        """Remove all the cached keys for a unit name.
+
+        This is an awkward function, as the cache in leader settings is 'flat'
+        to ensure that the set payloads are as small as possible.
+
+        This iterates through all the keys and if they match the prefix for the
+        unit_name, it clears them.
+
+        :param unit_name: The unit_name to clear.
+        :type unit_name: str
+        """
+        prefix = cls.PUBLISH_KEY_PREFIX.format(unit_name=unit_name)
+        leader_keys = (cls._fetch(None) or {}).keys()
+        for key in leader_keys:
+            if key.startswith(prefix):
+                cls._clear(key)
+
+
+def find_cert_in_cache(request):
+    """Return certificate and key from cache that match the request.
+
+    Returned certificate is validated against the current CA cert. If CA cert
+    is missing then the function returns (None, None).
+
+    If the certificate can't be found in vault, then a warning is logged, but
+    the cert is still returned as it is in leader_settings; the leader may
+    decide to remove it at a later date.
+
+    :param request: Request for certificate from "client" unit.
+    :type request: tls_certificates_common.CertificateRequest
+    :return: Certificate and private key from cache
+    :rtype: (str, str) | (None, None)
+    """
+    request_pki_cache = CertCache(request)
+    cert = request_pki_cache.cert
+    key = request_pki_cache.key
+    if cert is None or key is None:
+        return None, None
+
+    if not is_cert_from_vault(cert, name=CHARM_PKI_MP):
+        hookenv.log('Certificate from cache for "{}" (cn: "{}") was not found '
+                    'in vault, but is in the cache. Using, but may not be '
+                    'valid.'.format(request.unit_name, request.common_name),
+                    level=hookenv.WARNING)
+    return cert, key
+
+
+def update_cert_cache(request, cert, key):
+    """Store certificate and key in the cache.
+
+    Stored values are associated with the request from "client" unit,
+    so it can be later retrieved when the request is handled again.
+
+    :param request: Request for certificate from "client" unit.
+    :type request: tls_certificates_common.CertificateRequest
+    :param cert: Issued certificate for the "client" request (in PEM format)
+    :type cert: str
+    :param key: Issued private key from the "client" request (in PEM format)
+    :type key: str
+    :return: None
+    """
+    request_pki_cache = CertCache(request)
+    hookenv.log('Saving certificate for "{}" '
+                '(cn: "{}") into cache.'.format(request.unit_name,
+                                                request.common_name),
+                hookenv.DEBUG)
+
+    request_pki_cache.key = key
+    request_pki_cache.cert = cert
+
+
+def remove_unit_from_cache(unit_name):
+    """Clear certificates and keys related to the unit from the cache.
+
+    :param unit_name: Name of the unit to be removed from the cache.
+    :type unit_name: str
+    :return: None
+    """
+    hookenv.log('Removing certificates for unit "{}" from '
+                'cache.'.format(unit_name), hookenv.DEBUG)
+    CertCache.remove_all_for(unit_name)
+
+
+def populate_cert_cache(tls_endpoint):
+    """Store previously issued certificates in the cache.
+
+    This function is used when vault charm is upgraded from older version
+    that may not have a certificate cache to a version that has it. It
+    goes through all previously issued certificates and stores them in
+    cache.
+
+    :param tls_endpoint: Endpoint of "certificates" relation
+    :type tls_endpoint: interface_tls_certificates.provides.TlsProvides
+    :return: None
+    """
+    hookenv.log(
+        "Populating certificate cache with data from relations", hookenv.INFO
+    )
+
+    for request in tls_endpoint.all_requests:
+        try:
+            if request._is_top_level_server_cert:
+                relation_data = request._unit.relation.to_publish_raw
+                cert = relation_data[request._server_cert_key]
+                key = relation_data[request._server_key_key]
+            else:
+                relation_data = request._unit.relation.to_publish
+                cert = relation_data[request._publish_key][
+                    request.common_name
+                ]['cert']
+                key = relation_data[request._publish_key][
+                    request.common_name
+                ]['key']
+        except (KeyError, TypeError):
+            if request._is_top_level_server_cert:
+                cert_id = request._server_cert_key
+            else:
+                cert_id = request.common_name
+            hookenv.log(
+                'Certificate "{}" (or associated key) issued for unit "{}" '
+                'not found in relation data.'.format(
+                    cert_id, request._unit.unit_name
+                ),
+                hookenv.WARNING
+            )
+            continue
+
+        update_cert_cache(request, cert, key)
+
+
+def set_global_client_cert(bundle):
+    """Set the global cert for all units in the app.
+
+    :param bundle: the bundle returned from generate_certificates()
+    :type bundle: Dict[str, str]
+    :raises: RuntimeError if leader_set fails.
+    :raises: TypeError if the bundle can't be serialised.
+    """
+    try:
+        hookenv.leader_set(
+            {'charm.vault.global-client-cert': json.dumps(bundle)})
+    except TypeError:
+        raise
+    except Exception as e:
+        raise RuntimeError("Couldn't run leader_settings: {}".format(str(e)))
+
+
+def get_global_client_cert():
+    """Return the bundle returned from leader_settings.
+
+    Will return an empty dictionary if key is not present.
+
+    :returns: the bundle previously stored, or {}
+    :rtype: Dict[str, str]
+    """
+    bundle = hookenv.leader_get('charm.vault.global-client-cert')
+    if bundle:
+        return json.loads(bundle)
+    return {}
