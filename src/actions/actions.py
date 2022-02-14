@@ -15,6 +15,7 @@
 
 import base64
 import json
+import hvac
 import os
 import sys
 from traceback import format_exc
@@ -64,6 +65,29 @@ def get_intermediate_csrs(*args):
         hookenv.action_fail('Please run action on lead unit')
         return
     action_config = hookenv.action_get() or {}
+
+    ca_chain = None
+    try:
+        client = vault.get_local_client()
+        # vault_pki.get_chain will return None if the intermediate CA has
+        # never been setup. Whereas if it has been invalidated it will
+        # throw a hvac.exceptions.InternalServerError
+        ca_chain = client.read(
+            '{}/cert/ca_chain'.format(vault_pki.CHARM_PKI_MP))
+    except hvac.exceptions.InternalServerError as e:
+        # hvac returns this error string if the CA chain is not present.
+        if 'stored CA information not able to be parsed' in str(e):
+            ca_chain = None
+        else:
+            raise
+
+    if ca_chain and not action_config.get('force'):
+        hookenv.action_fail(
+            'This action will invalidate this intermediate CA chain until the '
+            'signed csr is uploaded. During this time no new certificate '
+            'requests will be processed. If you are sure you want to go ahead '
+            'with this then please run the action with force=True')
+        return
     csrs = vault_pki.get_csr(
         ttl=action_config.get('ttl'),
         country=action_config.get('country'),
@@ -72,13 +96,23 @@ def get_intermediate_csrs(*args):
         province=action_config.get('province'),
         organization=action_config.get('organization'),
         organizational_unit=action_config.get('organizational-unit'))
-    # We have to clear both the reactive flag, as well as the leadership
-    # managed root-ca option, otherwise, we will end up with the flag being
-    # reset in the reactive handler after this is run.
+    # The vault_pki.get_csr action is destructive and wipes the existing
+    # intermediate CA. To flag this to the charm we have to clear both the
+    # reactive flag, as well as the leadership managed root-ca option,
+    # otherwise, we will end up with the flag being reset in the reactive
+    # handler after this is run.
     clear_flag('charm.vault.ca.ready')
     hookenv.leader_set(
         {'root-ca': None})
     hookenv.action_set({'output': csrs})
+
+
+def get_csr(*args):
+    hookenv.log(
+        ("The get_csr action is deprecated, please use "
+         "regenerate-intermediate-ca"),
+        hookenv.WARNING)
+    return get_intermediate_csrs(args)
 
 
 def upload_signed_csr(*args):
@@ -272,7 +306,8 @@ def generate_cert(*args):
 ACTIONS = {
     "authorize-charm": authorize_charm_action,
     "refresh-secrets": refresh_secrets,
-    "get-csr": get_intermediate_csrs,
+    "get-csr": get_csr,
+    "regenerate-intermediate-ca": get_intermediate_csrs,
     "upload-signed-csr": upload_signed_csr,
     "reissue-certificates": reissue_certificates,
     "generate-root-ca": generate_root_ca,

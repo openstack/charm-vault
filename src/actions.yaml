@@ -9,7 +9,9 @@ authorize-charm:
 refresh-secrets:
   description: Refresh secret_id's and re-issue retrieval tokens for secrets endpoints
 get-csr:
-  description: Get intermediate CA csr
+  description: >-
+     Get intermediate CA csr (DEPRECATED Please use regenerate-intermediate-ca).
+     WARNING Current certificates will be invalidated and will be recreated after the CSR is signed and uploaded.
   properties:
     # Depending on the configuration of CA that will sign the CSRs it
     # may be necessary to ensure these fields match the CA
@@ -37,6 +39,47 @@ get-csr:
       type: string
       description: >-
         The L (Locality) values in the subject field of the CSR.
+    force:
+      type: boolean
+      default: False
+      description: >-
+        Requesting a new CSR and remove the existing intermediate CA
+regenerate-intermediate-ca:
+  description: >-
+     Create a new intermediate CA and return a csr for it
+     WARNING Current certificates will be invalidated and will be recreated after the CSR is signed and uploaded.
+  properties:
+    # Depending on the configuration of CA that will sign the CSRs it
+    # may be necessary to ensure these fields match the CA
+    country:
+      type: string
+      description: >-
+        The C (Country) values in the subject field of the CSR
+    province:
+      type: string
+      description: >-
+        The ST (Province) values in the subject field of the CSR.
+    organization:
+      type: string
+      description: >-
+        The O (Organization) values in the subject field of the CSR.
+    organizational-unit:
+      type: string
+      description: >-
+        The OU (OrganizationalUnit) values in the subject field of the CSR.
+    common-name:
+      type: string
+      description: >-
+        The CN (Common Name) values in the subject field of the CSR.
+    locality:
+      type: string
+      description: >-
+        The L (Locality) values in the subject field of the CSR.
+    force:
+      type: boolean
+      default: False
+      description: >-
+        Requesting a new CSR and remove the existing intermediate CA
 upload-signed-csr:
   description: Upload a signed csr to vault
   properties:

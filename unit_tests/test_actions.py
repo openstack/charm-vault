@@ -3,6 +3,9 @@ from unittest.mock import patch
 import src.actions.actions as actions
 import unit_tests.test_utils
 
+import mock
+import hvac
+
 
 class TestActions(unit_tests.test_utils.CharmTestCase):
 
@@ -11,6 +14,9 @@ class TestActions(unit_tests.test_utils.CharmTestCase):
         self.patches = []
         self.patch_all()
         self.patch_object(actions, 'hookenv', name='mock_hookenv')
+        self.patch_object(actions.vault, 'get_local_client')
+        self.client = mock.MagicMock()
+        self.get_local_client.return_value = self.client
 
     def test_generate_cert_not_leader(self):
         """Test when not leader, action fails"""
@@ -66,3 +72,40 @@ class TestActions(unit_tests.test_utils.CharmTestCase):
         self.mock_hookenv.action_fail.assert_called_with(
             'Vault is not ready (1)'
         )
+
+    def test_get_intermediate_csrs(self):
+        self.mock_hookenv.is_leader.return_value = True
+        self.client.read.return_value = None
+        actions.get_intermediate_csrs()
+        self.mock_hookenv.leader_set.assert_called_once_with({'root-ca': None})
+        self.assertFalse(self.mock_hookenv.action_fail.called)
+
+    def test_get_intermediate_csrs_invalid_ca(self):
+        self.mock_hookenv.is_leader.return_value = True
+        self.client.read.side_effect = hvac.exceptions.InternalServerError(
+            errors=['stored CA information not able to be parsed'])
+        actions.get_intermediate_csrs()
+        self.mock_hookenv.leader_set.assert_called_once_with({'root-ca': None})
+        self.assertFalse(self.mock_hookenv.action_fail.called)
+
+    def test_get_intermediate_csrs_existing_cert(self):
+        self.mock_hookenv.is_leader.return_value = True
+        self.mock_hookenv.action_get.return_value = {'force': False}
+        self.client.read.return_value = 'a-chain'
+        actions.get_intermediate_csrs()
+        self.assertFalse(self.mock_hookenv.leader_set.called)
+        self.mock_hookenv.action_fail.assert_called()
+
+    def test_get_intermediate_csrs_existing_cert_force(self):
+        self.mock_hookenv.is_leader.return_value = True
+        self.mock_hookenv.action_get.return_value = {'force': True}
+        self.client.read.return_value = 'a-chain'
+        actions.get_intermediate_csrs()
+        self.mock_hookenv.leader_set.assert_called_once_with({'root-ca': None})
+        self.assertFalse(self.mock_hookenv.action_fail.called)
+
+    def test_get_intermediate_csrs_non_leader(self):
+        self.mock_hookenv.is_leader.return_value = False
+        actions.get_intermediate_csrs()
+        self.assertFalse(self.mock_hookenv.leader_set.called)
+        self.mock_hookenv.action_fail.assert_called()
