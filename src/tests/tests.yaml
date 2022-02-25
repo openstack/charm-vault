@@ -3,39 +3,31 @@ charm_name: vault
 configure:
 - zaza.openstack.charm_tests.vault.setup.basic_setup
 
-dev_bundles:
-- bionic
-- hirsute-mysql8
-- impish-mysql8
+dev_bundles: []
 
 gate_bundles:
-- xenial-ha-mysql
-- xenial-postgres
-- xenial-mysql
-- bionic-postgres
-- bionic-mysql
 - focal-mysql8
-- groovy-mysql8
+- focal-ha-mysql8
 
 smoke_bundles:
 - focal-mysql8
 
 target_deploy_status:
   easyrsa:
-    workload-status-message: Certificate Authority connected.
+    workload-status-message-prefix: Certificate Authority connected.
   etcd:
-    workload-status-message: Healthy
+    workload-status-message-prefix: Healthy
   postgresql:
-    workload-status-message: Live
+    workload-status-message-prefix: Live
   vault:
     workload-status: blocked
-    workload-status-message: Vault needs to be initialized
+    workload-status-message-prefix: Vault needs to be initialized
   ceph-osd:
     workload-status: waiting
-    workload-status-message: "Incomplete relation: vault"
+    workload-status-message-prefix: "Incomplete relation: vault"
   ceph-mon:
     workload-status: waiting
-    workload-status-message: "Monitor bootstrapped but waiting for number of OSDs to reach expected-osd-count (3)"
+    workload-status-message-prefix: "Monitor bootstrapped but waiting for number of OSDs to reach expected-osd-count (3)"
 
 tests:
 - zaza.openstack.charm_tests.vault.tests.VaultTest
@@ -43,7 +35,3 @@ tests:
 # root CA in Vault with a refreshed CSR and won't end up in a hook-error
 # state. (LP: #1866150).
 - zaza.openstack.charm_tests.vault.tests.VaultTest
-
-tests_options:
-  force_deploy:
-    - impish-mysql8
