@@ -46,8 +46,6 @@ applications:
   vault:
     num_units: 1
     charm: ../../../vault.charm
-    options:
-      channel: 1.5/stable
     to:
       - '3'
 
