@@ -54,7 +54,6 @@ applications:
     charm: ../../../vault.charm
     options:
       vip: 'ADD YOUR VIP HERE'
-      channel: 1.6/stable
     to:
       - '3'
       - '11'
