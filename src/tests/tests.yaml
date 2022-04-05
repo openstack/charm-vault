@@ -5,7 +5,6 @@ configure:
 
 gate_bundles:
 - focal-mysql8
-- impish-mysql8
 
 dev_bundles:
 - jammy-mysql8
@@ -39,5 +38,4 @@ tests:
 
 tests_options:
   force_deploy:
-    - impish-mysql8
     - jammy-mysql8

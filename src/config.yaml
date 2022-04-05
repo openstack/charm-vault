@@ -53,7 +53,7 @@ options:
       config option or lb-provider relation.
   channel:
     type: string
-    default: stable
+    default: 1.8/stable
     description: >-
       The snap channel to install from.
   dns-ha-access-record:

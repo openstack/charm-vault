@@ -1,12 +1,10 @@
 - project:
     templates:
       - charm-unit-jobs-py38
-      - charm-unit-jobs-py39
+      - charm-unit-jobs-py310
     check:
       jobs:
       - focal-mysql8
-      - impish-mysql8:
-          voting: false
       - jammy-mysql8:
           voting: false
     vars:
@@ -20,21 +18,15 @@
     dependencies:
       - osci-lint
       - tox-py38
-      - tox-py39
       - charm-build
     vars:
       tox_extra_args: focal-mysql8
-- job:
-    name: impish-mysql8
-    parent: func-target
-    dependencies:
-      - focal-mysql8
-    vars:
-      tox_extra_args: impish-mysql8
 - job:
     name: jammy-mysql8
     parent: func-target
     dependencies:
       - focal-mysql8
+      - name: tox-py310
+        soft: True
     vars:
       tox_extra_args: jammy-mysql8

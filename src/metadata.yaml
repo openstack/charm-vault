@@ -13,7 +13,7 @@ description: |
   SSH credentials, and more.
 series:
 - focal
-- impish
+- jammy
 tags:
 - security
 extra-bindings:
