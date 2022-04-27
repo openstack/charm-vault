@@ -3,11 +3,11 @@ charm_name: vault
 configure:
 - zaza.openstack.charm_tests.vault.setup.basic_setup
 
-dev_bundles: []
-
 gate_bundles:
 - focal-mysql8
-- focal-ha-mysql8
+
+dev_bundles:
+- jammy-mysql8
 
 smoke_bundles:
 - focal-mysql8
@@ -35,3 +35,7 @@ tests:
 # root CA in Vault with a refreshed CSR and won't end up in a hook-error
 # state. (LP: #1866150).
 - zaza.openstack.charm_tests.vault.tests.VaultTest
+
+tests_options:
+  force_deploy:
+    - jammy-mysql8

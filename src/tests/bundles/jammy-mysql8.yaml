@@ -1,9 +1,9 @@
-local_overlay_enabled: False
-
 variables:
   openstack-origin: &openstack-origin distro
 
-series: focal
+local_overlay_enabled: False
+
+series: jammy
 
 comment:
 - 'machines section to decide order of deployment. database sooner = faster'

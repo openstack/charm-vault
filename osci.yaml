@@ -1,10 +1,12 @@
 - project:
     templates:
       - charm-unit-jobs-py38
+      - charm-unit-jobs-py310
     check:
       jobs:
       - focal-mysql8
-      - focal-ha-mysql8
+      - jammy-mysql8:
+          voting: false
     vars:
       needs_charm_build: true
       charm_build_name: vault
@@ -14,15 +16,17 @@
     name: focal-mysql8
     parent: func-target
     dependencies:
-      - charm-build
+      - osci-lint
       - tox-py38
+      - charm-build
     vars:
       tox_extra_args: focal-mysql8
 - job:
-    name: focal-ha-mysql8
+    name: jammy-mysql8
     parent: func-target
     dependencies:
-      - charm-build
-      - tox-py38
+      - focal-mysql8
+      - name: tox-py310
+        soft: True
     vars:
-      tox_extra_args: focal-ha-mysql8
+      tox_extra_args: jammy-mysql8
