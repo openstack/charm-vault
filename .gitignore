@@ -5,3 +5,4 @@ build/*
 __pycache__
 .unit-state.db
 interfaces
+*.charm
