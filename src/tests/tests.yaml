@@ -5,6 +5,9 @@ configure:
 
 gate_bundles:
 - focal-mysql8
+- focal-raft
+- focal-raft-cluster
+- jammy-raft
 
 dev_bundles:
 - jammy-mysql8

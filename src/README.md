@@ -23,7 +23,7 @@ on configuring applications.
 #### `channel`
 
 The `channel` option sets the snap channel to use for deployment (e.g.
-'latest/edge'). The default value is 'latest/stable'.
+'latest/edge'). The default value is '1.8/stable'.
 
 ## Deployment
 
@@ -64,6 +64,11 @@ For postgresql:
 > **Note**: For PostgreSQL, its version and the underlying machine series must
   be compatible (e.g. 9.5/xenial or 10/bionic). The postgresql charm's
   configuration option `version` is used to select a version at deploy time.
+
+If no databases are related, vault will be auto configured to use
+its embedded raft storage backend for storage and HA.
+Note that raft storage is only supported in Vault 1.8/stable or newer
+(see `channel` in charm config).
 
 ## TLS
 

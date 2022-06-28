@@ -164,4 +164,14 @@ generate-certificate:
       default: 8760h
       description: >-
         Specifies the maximum Time To Live for generated certificates.
-
+raft-state:
+  description: >-
+    Get the raft cluster state.
+raft-bootstrap-node:
+  description: >-
+    If and only if quorum is permanently lost
+    (ie. impossible to recover enough nodes to reach quorum),
+    then use this action on a single unit to re-bootstrap the raft cluster
+    from this node.  Remove all other units before running this.
+    This runs the procedure documented at
+    https://support.hashicorp.com/hc/en-us/articles/360050756393

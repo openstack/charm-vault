@@ -22,8 +22,13 @@ storage "mysql" {
   tls_ca_file = "{{ tls_ca_file }}"
   {%- endif %}
 }
+{% elif storage_name == 'raft' %}
+storage "raft" {
+  path = "/var/snap/vault/common/data/"
+  node_id = "{{ node_id }}"
+}
 {%- endif %}
-{%- if etcd_conn %}
+{%- if etcd_conn and storage_name != 'raft' %}
 ha_storage "etcd" {
   ha_enabled = "true"
   address = "{{ etcd_conn }}"

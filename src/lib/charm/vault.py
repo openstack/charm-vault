@@ -15,6 +15,7 @@
 import functools
 import json
 import requests
+import traceback
 
 import hvac
 import tenacity
@@ -62,6 +63,16 @@ path "sys/mounts/charm-*" {
 # Allow charm- prefixes pki backends to be used
 path "charm-pki-*" {
   capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+}
+
+# Allow cleaning up raft peers on removing units.
+path "sys/storage/raft/remove-peer" {
+  capabilities = ["create", "update"]
+}
+
+# Allow viewing raft cluster state
+path "sys/storage/raft/autopilot/state" {
+  capabilities = ["read"]
 }
 
 # Allow discovery of secrets backends
@@ -140,6 +151,13 @@ get_cluster_url = functools.partial(get_vault_url,
                                     binding='cluster', port=8201)
 
 
+def local_raft_node_id():
+    """
+    Generate and return an ID for the local node.
+    """
+    return hookenv.local_unit()
+
+
 def get_vip(binding=None):
     vip = hookenv.config('vip')
     if not vip:
@@ -174,6 +192,14 @@ def get_access_address():
     return '{}://{}:{}'.format(protocol, addr, 8200)
 
 
+# auto retry this function
+# because this is called early in setup if totally-unsecure-auto-unlock,
+# and this will fail if raft cluster is used and it's still settling.
+@tenacity.retry(wait=tenacity.wait_exponential(multiplier=1, max=60),
+                stop=tenacity.stop_after_attempt(8),
+                retry=tenacity.retry_if_exception_type(
+                    hvac.exceptions.InternalServerError),
+                reraise=True)
 def enable_approle_auth(client):
     """Enable the approle auth method within vault
 
@@ -429,6 +455,55 @@ def is_backend_mounted(client, name):
     :rtype: bool
     """
     return '{}/'.format(name) in client.sys.list_mounted_secrets_engines()
+
+
+def get_raft_autopilot_state(client):
+    """
+    Return json data for the current raft cluster state.
+
+    :param client: Vault client
+    :ptype client: hvac.Client
+    :returns: raft cluster state data
+    :rtype: dict
+    """
+    return client.read("sys/storage/raft/autopilot/state")
+
+
+def is_cluster_ready():
+    """
+    Check if the cluster is ready.
+
+    Mostly useful for use with the raft backend.
+    It can take a few seconds to settle,
+    and in the meantime, most vault requests will fail with
+    'local node not active but active cluster node not found'.
+    Vault will return this error if it's not a leader,
+    and it doesn't know the leader address to forward to yet.
+    """
+    # Reading the leader status
+    # and checking that the node has now registered the address
+    # of the leader should be enough to determine readiness.
+    # There isn't a definitive way to check this.
+    # I chose this because it's a single unauthenticated request,
+    # that returns a usable result even when the cluster isn't ready.
+    # In the 'local node not active but active cluster node not found' state,
+    # authentication fails,
+    # and so do requests to the raft/autopilot endpoints.
+    # An alternative is to make an unauthenticated request
+    # to the autopilot state endpoint,
+    # and check for a 500 error with that error message,
+    # but that feels hacky and relies on the error remaining consistent.
+    client = get_client(url=VAULT_LOCALHOST_URL)
+    try:
+        response = client.sys.read_leader_status()
+    except Exception:
+        hookenv.log(traceback.format_exc(), level=hookenv.ERROR)
+        return False
+
+    if response.get('leader_address'):
+        return True
+
+    return False
 
 
 def vault_ready_for_clients():

@@ -26,7 +26,10 @@ from charmhelpers.core.hookenv import (
     application_version_set,
     atexit,
     config,
+    departing_unit,
     DEBUG,
+    INFO,
+    WARNING,
     ERROR,
     hook_name,
     leader_get,
@@ -46,11 +49,14 @@ from charmhelpers.core.host import (
     service_running,
     write_file,
     is_container,
+    mkdir,
 )
 
 from charmhelpers.core.templating import (
     render,
 )
+
+from charmhelpers.contrib.hahelpers.cluster import peer_ips
 
 from charmhelpers.core import unitdata
 
@@ -61,6 +67,8 @@ from charms.reactive import (
     set_state,
     when,
     any_file_changed,
+    when_all,
+    when_none,
     when_not,
     when_any,
 )
@@ -71,6 +79,7 @@ from charms.reactive.relations import (
 )
 
 from charms.reactive.flags import (
+    any_flags_set,
     is_flag_set,
     set_flag,
     clear_flag,
@@ -100,8 +109,6 @@ CREATE INDEX IF NOT EXISTS parent_path_idx ON vault_kv_store (parent_path);
 
 OPTIONAL_INTERFACES = [
     ['etcd'],
-]
-REQUIRED_INTERFACES = [
     ['shared-db', 'db.master']
 ]
 
@@ -201,7 +208,11 @@ def configure_vault(context):
 
     context['ssl_available'] = is_state('vault.ssl.available')
 
-    if is_flag_set('etcd.tls.available'):
+    if context.get('storage_name') == 'raft':
+        context['api_addr'] = vault.get_api_url()
+        context['cluster_addr'] = vault.get_cluster_url()
+        context['node_id'] = vault.local_raft_node_id()
+    elif is_flag_set('etcd.tls.available'):
         etcd = endpoint_from_flag('etcd.available')
         log("Etcd detected, adding to context", level=DEBUG)
         context['etcd_conn'] = etcd.connection_string()
@@ -278,6 +289,45 @@ def configure_vault_mysql(mysql):
         write_file(_db_tls_ca_file, _db_tls_ca, perms=0o600)
         context["tls_ca_file"] = _db_tls_ca_file
     configure_vault(context)
+
+
+@when_all('vault.ssl.configured', 'snap.installed.vault')
+@when_none(
+    'is-update-status-hook',
+    'db.master.available',
+    'shared-db.available',
+    'etcd.tls.available'
+)
+def configure_vault_raft():
+    mkdir('/var/snap/vault/common/data/', perms=0o700)
+    context = {
+        'storage_name': 'raft',
+    }
+    configure_vault(context)
+
+
+@hook('cluster-relation-departed')
+def on_raft_node_depart():
+    '''
+    Clean up before a node is removed.
+
+    This is only applicable to the raft storage backend.
+    '''
+    # cannot use these flags as @when decorators along with @hook
+    # otherwise the function is never triggered.
+    if not any_flags_set(
+            'db.master.available',
+            'shared-db.available',
+            'etcd.tls.available'
+    ):
+        log("removing departing node from raft: {}".format(departing_unit()),
+            level=DEBUG)
+        client = vault.get_local_client()
+        # Removing the raft node should only be done here,
+        # when a unit is being removed (peer relation departing for good),
+        # because the node cannot be re-added
+        # without starting from a fresh data directory.
+        client.sys.remove_raft_node(departing_unit())
 
 
 @when_not("is-update-status-hook")
@@ -461,6 +511,44 @@ def cluster_connected(hacluster):
             ip = unit_private_ip()
         hacluster.add_dnsha('vault', ip, dns_record, 'access')
     hacluster.bind_resources()
+
+
+@when_none(
+    'is-update-status-hook',
+    'db.master.available',
+    'shared-db.available',
+    'etcd.tls.available'
+)
+@when('started')
+def join_raft_peers():
+    # we can launch the raft join requests as soon as vault is started,
+    # because in this case vault doesn't need to be initialized or unsealed.
+    ssl_cert = None
+    ssl_key = None
+    if ssl_available(config()):
+        ssl_cert = base64.decodebytes(config('ssl-key').encode())
+        ssl_key = base64.decodebytes(config('ssl-cert').encode())
+        if config('ssl-chain'):
+            ssl_cert += base64.decodebytes(config('ssl-chain').encode())
+    ssl_ca = None
+    if config('ssl-ca'):
+        ssl_ca = base64.decodebytes(config('ssl-ca').encode())
+
+    client = vault.get_client(url=vault.VAULT_LOCALHOST_URL)
+
+    for ip in peer_ips().values():
+        address = vault.get_vault_url('arbitrary', port=8200, address=ip)
+        log('Joining raft cluster address {}'.format(address), level=INFO)
+        try:
+            client.sys.join_raft_cluster(
+                address,
+                retry=True,
+                leader_client_cert=ssl_cert,
+                leader_client_key=ssl_key,
+                leader_ca_cert=ssl_ca,
+            )
+        except Exception as e:
+            log('Failed to join raft cluster: {}'.format(e), level=WARNING)
 
 
 @when_not("is-update-status-hook")
@@ -765,19 +853,6 @@ def _assess_status():
                    "Vault failed to start; check journalctl -u vault")
         return
 
-    _missing_interfaces = []
-    _incomplete_interfaces = []
-
-    _assess_interface_groups(REQUIRED_INTERFACES, optional=False,
-                             missing_interfaces=_missing_interfaces,
-                             incomplete_interfaces=_incomplete_interfaces)
-
-    if _missing_interfaces or _incomplete_interfaces:
-        state = 'blocked' if _missing_interfaces else 'waiting'
-        status_set(state, ', '.join(_missing_interfaces +
-                                    _incomplete_interfaces))
-        return
-
     health = None
     if service_running('vault'):
         try:
@@ -803,6 +878,19 @@ def _assess_status():
 
     if health['sealed']:
         status_set('blocked', 'Unit is sealed')
+        return
+
+    # if configured for raft cluster, check if it's settled
+    if not (
+        any_flags_set(
+            'db.master.available',
+            'shared-db.available',
+            'etcd.tls.available'
+        ) or vault.is_cluster_ready()
+    ):
+        status_set(
+            'waiting',
+            'Waiting for raft cluster to settle.')
         return
 
     if not leader_get(vault.CHARM_ACCESS_ROLE_ID):
@@ -840,6 +928,9 @@ def _assess_status():
     if is_leader and has_certs_relation and not has_ca:
         status_set('blocked', 'Missing CA cert')
         return
+
+    _missing_interfaces = []
+    _incomplete_interfaces = []
 
     _assess_interface_groups(OPTIONAL_INTERFACES, optional=True,
                              missing_interfaces=_missing_interfaces,
@@ -901,7 +992,6 @@ def client_approle_authorized():
 
 
 @when_not("is-update-status-hook")
-@when_any('db.master.available', 'shared-db.available')
 @when('leadership.is_leader',
       'config.set.auto-generate-root-ca-cert')
 @when_not('charm.vault.ca.ready',
@@ -940,7 +1030,6 @@ def takeover_cert_leadership():
 
 
 @when_not("is-update-status-hook")
-@when_any('db.master.available', 'shared-db.available')
 @when('leadership.is_leader',
       'charm.vault.ca.ready',
       'certificates.available')
@@ -970,7 +1059,6 @@ def publish_ca_info():
 
 
 @when_not("is-update-status-hook")
-@when_any('db.master.available', 'shared-db.available')
 @when('leadership.is_leader',
       'charm.vault.ca.ready',
       'certificates.available')
@@ -1074,7 +1162,6 @@ def tune_pki_backend():
 
 
 @when_not("is-update-status-hook")
-@when_any('db.master.available', 'shared-db.available')
 @when('leadership.is_leader',
       'charm.vault.ca.ready')
 @when('config.set.default-ttl')

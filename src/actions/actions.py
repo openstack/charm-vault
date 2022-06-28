@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import base64
+import json
 import os
 import sys
 from traceback import format_exc
@@ -28,6 +29,7 @@ basic.init_config_states()
 import charmhelpers.core.hookenv as hookenv
 import charmhelpers.core.unitdata as unitdata
 import charmhelpers.core.host as host
+import yaml
 
 import charm.vault as vault
 import charm.vault_pki as vault_pki
@@ -157,6 +159,52 @@ def pause(args):
     handlers.pause_vault_unit()
 
 
+def raft_bootstrap_node(*args):
+    """
+    Re-bootstrap the current node as a new raft cluster with this single node.
+
+    https://learn.hashicorp.com/tutorials/vault/raft-lost-quorum
+    https://support.hashicorp.com/hc/en-us/articles/360050756393
+    """
+    # Write a peers.json file to the raft data directory.
+    # This tells vault that we want a raft cluster,
+    # and the cluster should be started with this single node.
+    # Vault will delete the file once it has been restarted and unsealed.
+    peers_config = [{
+        "id": vault.local_raft_node_id(),
+        "address": vault.get_cluster_url(),
+        "non_voter": False,
+    }]
+    with open('/var/snap/vault/common/data/raft/peers.json', 'w') as f:
+        json.dump(peers_config, f, indent=2)
+
+    # Restart the vault service.
+    # It will read the peers.json file,
+    # and configure itself as an operational raft cluster
+    # with itself as the only node.
+    host.service_restart(service_name='vault')
+
+    hookenv.action_set({
+        'output': 'Raft cluster bootstrapped.  Please unseal this node, '
+                  'then add new units with juju as usual.  '
+                  'New units will auto join the cluster once unsealed. '
+                  'Old existing units should be removed.'
+    })
+
+
+def raft_state(*args):
+    """Outputs the current state of the raft cluster.
+
+    https://www.vaultproject.io/api-docs/system/storage/raftautopilot
+    """
+    try:
+        client = vault.get_local_client()
+        state = vault.get_raft_autopilot_state(client)
+        hookenv.action_set({'output': yaml.dump(state)})
+    except vault.VaultError as e:
+        hookenv.action_fail(str(e))
+
+
 def resume(args):
     """Resumes the Vault service.
 
@@ -231,6 +279,8 @@ ACTIONS = {
     "get-root-ca": get_root_ca,
     "disable-pki": disable_pki,
     "pause": pause,
+    "raft-bootstrap-node": raft_bootstrap_node,
+    "raft-state": raft_state,
     "resume": resume,
     "restart": restart,
     "reload": reload,

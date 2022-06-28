@@ -74,6 +74,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             'is_container',
             'unitdata',
             'is_unit_paused_set',
+            'any_flags_set',
         ]
         self.patch_all()
         self.is_container.return_value = False
@@ -334,6 +335,47 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         self.is_flag_set.assert_called_with('etcd.tls.available')
         self.config.assert_called_with('disable-mlock')
 
+    @patch.object(handlers.vault, 'local_raft_node_id')
+    @patch.object(handlers.vault, 'get_cluster_url')
+    @patch.object(handlers.vault, 'can_restart')
+    @patch.object(handlers.vault, 'get_api_url')
+    def test_configure_vault_raft(self, get_api_url, can_restart,
+                                  get_cluster_url, local_raft_node_id):
+        can_restart.return_value = True
+        get_cluster_url.return_value = 'http://this-unit:8201'
+        get_api_url.return_value = 'http://this-unit:8200'
+        local_raft_node_id.return_value = 'vault/0'
+
+        def config_mock(key):
+            if key == 'disable-mlock':
+                return False
+
+        self.config.side_effect = config_mock
+        self.is_flag_set.return_value = False
+        self.endpoint_from_flag.return_value = None
+        self.is_state.return_value = True
+        handlers.configure_vault({'storage_name': 'raft'})
+        expected_context = {
+            'disable_mlock': False,
+            'ssl_available': True,
+            'storage_name': 'raft',
+            'api_addr': 'http://this-unit:8200',
+            'node_id': 'vault/0',
+            'cluster_addr': 'http://this-unit:8201'}
+        render_calls = [
+            mock.call(
+                'vault.hcl.j2',
+                '/var/snap/vault/common/vault.hcl',
+                expected_context,
+                perms=0o600),
+            mock.call(
+                'vault.service.j2',
+                '/etc/systemd/system/vault.service',
+                {},
+                perms=0o644)
+        ]
+        self.render.assert_has_calls(render_calls)
+
     @patch.object(handlers, 'leader_get')
     @patch.object(handlers, 'client_approle_authorized')
     @patch.object(handlers, '_assess_interface_groups')
@@ -357,10 +399,6 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             'active', 'Unit is ready (active: true, mlock: enabled)')
         self.config.assert_called_with('disable-mlock')
         _assess_interface_groups.assert_has_calls([
-            mock.call(handlers.REQUIRED_INTERFACES,
-                      optional=False,
-                      missing_interfaces=mock.ANY,
-                      incomplete_interfaces=mock.ANY),
             mock.call(handlers.OPTIONAL_INTERFACES,
                       optional=True,
                       missing_interfaces=mock.ANY,
