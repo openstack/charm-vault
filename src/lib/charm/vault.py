@@ -179,8 +179,8 @@ def enable_approle_auth(client):
 
     :param client: Vault client
     :type client: hvac.Client"""
-    if 'approle/' not in client.list_auth_backends():
-        client.enable_auth_backend('approle')
+    if 'approle/' not in client.sys.list_auth_methods():
+        client.sys.enable_auth_method('approle')
 
 
 def create_local_charm_access_role(client, policies):
@@ -192,14 +192,15 @@ def create_local_charm_access_role(client, policies):
     :type policies: [str, str, ...]
     :returns: Id of created role
     :rtype: str"""
-    client.create_role(
+    client.auth.approle.create_or_update_approle(
         CHARM_ACCESS_ROLE,
         token_ttl='60s',
         token_max_ttl='60s',
-        policies=policies,
+        token_policies=policies,
         bind_secret_id='false',
-        bound_cidr_list='127.0.0.1/32')
-    return client.get_role_id(CHARM_ACCESS_ROLE)
+        token_bound_cidrs=['127.0.0.1/32'])
+    response = client.auth.approle.read_role_id(CHARM_ACCESS_ROLE)
+    return response["data"]["role_id"]
 
 
 def setup_charm_vault_access(token=None):
@@ -216,7 +217,7 @@ def setup_charm_vault_access(token=None):
         token=token)
     enable_approle_auth(client)
     policies = [CHARM_POLICY_NAME]
-    client.set_policy(CHARM_POLICY_NAME, CHARM_POLICY)
+    client.sys.create_or_update_policy(CHARM_POLICY_NAME, CHARM_POLICY)
     return create_local_charm_access_role(client, policies=policies)
 
 
@@ -254,8 +255,7 @@ def get_local_client():
     if not app_role_id:
         hookenv.log('Could not retrieve app_role_id', level=hookenv.DEBUG)
         raise VaultNotReady("Cannot initialise local client")
-    client = hvac.Client(url=VAULT_LOCALHOST_URL)
-    client.auth_approle(app_role_id)
+    client.auth.approle.login(app_role_id)
     return client
 
 
@@ -312,7 +312,7 @@ def initialize_vault(shares=1, threshold=1):
     :type threshold: int
     """
     client = get_client(url=VAULT_LOCALHOST_URL)
-    result = client.initialize(shares, threshold)
+    result = client.sys.initialize(shares, threshold)
     client.token = result['root_token']
     hookenv.leader_set(
         root_token=result['root_token'],
@@ -326,7 +326,7 @@ def unseal_vault(keys=None):
     if not keys:
         keys = json.loads(hookenv.leader_get()['keys'])
     for key in keys:
-        client.unseal(key)
+        client.sys.submit_unseal_key(key)
 
 
 def can_restart():
@@ -342,9 +342,9 @@ def can_restart():
         safe_restart = True
     else:
         client = get_client(url=VAULT_LOCALHOST_URL)
-        if not client.is_initialized():
+        if not client.sys.is_initialized():
             safe_restart = True
-        elif client.is_sealed():
+        elif client.sys.is_sealed():
             safe_restart = True
     hookenv.log(
         "Safe to restart: {}".format(safe_restart),
@@ -359,11 +359,13 @@ def configure_secret_backend(client, name):
     :ptype client: hvac.Client
     :param name: Name of backend to enable
     :ptype name: str"""
-    if '{}/'.format(name) not in client.list_secret_backends():
-        client.enable_secret_backend(backend_type='kv',
-                                     description='Charm created KV backend',
-                                     mount_point=name,
-                                     options={'version': 1})
+    if '{}/'.format(name) not in client.sys.list_mounted_secrets_engines():
+        client.sys.enable_secrets_engine(
+            backend_type='kv',
+            description='Charm created KV backend',
+            path=name,
+            options={'version': 1}
+        )
 
 
 def configure_policy(client, name, hcl):
@@ -375,7 +377,7 @@ def configure_policy(client, name, hcl):
     :ptype name: str
     :param hcl: Vault policy HCL
     :ptype hcl: str"""
-    client.set_policy(name, hcl)
+    client.sys.create_or_update_policy(name, hcl)
 
 
 def configure_approle(client, name, cidr, policies):
@@ -391,14 +393,14 @@ def configure_approle(client, name, cidr, policies):
     :ptype policies: [str, str, ...]
     :returns: Id of created role
     :rtype: str"""
-    client.create_role(
+    client.auth.approle.create_or_update_approle(
         name,
         token_ttl='60s',
         token_max_ttl='60s',
-        policies=policies,
+        token_policies=policies,
         bind_secret_id='true',
-        bound_cidr_list=cidr)
-    return client.get_role_id(name)
+        token_bound_cidrs=[cidr])
+    return client.auth.approle.read_role_id(name)["data"]["role_id"]
 
 
 def generate_role_secret_id(client, name, cidr):
@@ -412,6 +414,9 @@ def generate_role_secret_id(client, name, cidr):
     :ptype cidr: str
     :returns: Vault token to retrieve the response-wrapped response
     :rtype: str"""
+    # NOTE: cannot use client.auth.approle.generate_secret_id()
+    #       because that doesn't support wrap_ttl
+    #       https://github.com/hvac/hvac/issues/683
     response = client.write('auth/approle/role/{}/secret-id'.format(name),
                             wrap_ttl='1h', cidr_list=cidr)
     return response['wrap_info']['token']
@@ -423,7 +428,7 @@ def is_backend_mounted(client, name):
     :returns: Whether mount point is in use
     :rtype: bool
     """
-    return '{}/'.format(name) in client.list_secret_backends()
+    return '{}/'.format(name) in client.sys.list_mounted_secrets_engines()
 
 
 def vault_ready_for_clients():
@@ -433,8 +438,8 @@ def vault_ready_for_clients():
                     reraise=True)
     def _check_vault_status(client):
         if (not host.service_running('vault') or
-                not client.is_initialized() or
-                client.is_sealed()):
+                not client.sys.is_initialized() or
+                client.sys.is_sealed()):
             return False
         return True
 

@@ -28,10 +28,10 @@ def configure_pki_backend(client, name, ttl=None, max_ttl=None):
     :type ttl: str
     """
     if not vault.is_backend_mounted(client, name):
-        client.enable_secret_backend(
+        client.sys.enable_secrets_engine(
             backend_type='pki',
             description='Charm created PKI backend',
-            mount_point=name,
+            path=name,
             # Default ttl to 10 years
             config={
                 'default_lease_ttl': ttl or '8759h',
@@ -43,12 +43,12 @@ def disable_pki_backend():
     """
     client = vault.get_local_client()
     if vault.is_backend_mounted(client, CHARM_PKI_MP):
-        client.delete('{}/root'.format(CHARM_PKI_MP))
-        client.delete('{}/roles/{}'.format(CHARM_PKI_MP,
-                                           CHARM_PKI_ROLE_CLIENT))
-        client.delete('{}/roles/{}'.format(CHARM_PKI_MP,
-                                           CHARM_PKI_ROLE))
-        client.disable_secret_backend(CHARM_PKI_MP)
+        client.secrets.pki.delete_root(mount_point=CHARM_PKI_MP)
+        client.secrets.pki.delete_role(CHARM_PKI_ROLE_CLIENT,
+                                       mount_point=CHARM_PKI_MP)
+        client.secrets.pki.delete_role(CHARM_PKI_ROLE,
+                                       mount_point=CHARM_PKI_MP)
+        client.sys.disable_secrets_engine(CHARM_PKI_MP)
 
 
 def tune_pki_backend(ttl=None, max_ttl=None):
@@ -59,9 +59,8 @@ def tune_pki_backend(ttl=None, max_ttl=None):
     """
     client = vault.get_local_client()
     if vault.is_backend_mounted(client, CHARM_PKI_MP):
-        client.tune_secret_backend(
-            backend_type='pki',
-            mount_point=CHARM_PKI_MP,
+        client.sys.tune_mount_configuration(
+            path=CHARM_PKI_MP,
             default_lease_ttl=ttl or '8759h',
             max_lease_ttl=max_ttl or '87600h')
 
@@ -72,7 +71,7 @@ def is_ca_ready(client, name, role):
     :returns: Whether CA is ready
     :rtype: bool
     """
-    return client.read('{}/roles/{}'.format(name, role)) is not None
+    return client.secrets.pki.read_role(role, mount_point=name) is not None
 
 
 def get_chain(name=None):
@@ -84,7 +83,9 @@ def get_chain(name=None):
     client = vault.get_local_client()
     if not name:
         name = CHARM_PKI_MP
-    return client.read('{}/cert/ca_chain'.format(name))['data']['certificate']
+    response = client.secrets.pki.read_certificate('ca_chain',
+                                                   mount_point=name)
+    return response['data']['certificate']
 
 
 def get_ca():
@@ -120,9 +121,7 @@ def generate_certificate(cert_type, common_name, sans, ttl, max_ttl):
     else:
         raise vault.VaultInvalidRequest('Unsupported cert_type: '
                                         '{}'.format(cert_type))
-    config = {
-        'common_name': common_name,
-    }
+    config = {}
     if sans:
         ip_sans, alt_names = sort_sans(sans)
         if ip_sans:
@@ -130,8 +129,12 @@ def generate_certificate(cert_type, common_name, sans, ttl, max_ttl):
         if alt_names:
             config['alt_names'] = ','.join(alt_names)
     try:
-        response = client.write('{}/issue/{}'.format(CHARM_PKI_MP, role),
-                                **config)
+        response = client.secrets.pki.generate_certificate(
+            role,
+            common_name,
+            extra_params=config,
+            mount_point=CHARM_PKI_MP,
+        )
         if not response['data']:
             raise vault.VaultError(response.get('warnings', 'unknown error'))
     except hvac.exceptions.InvalidRequest as e:
@@ -168,6 +171,11 @@ def get_csr(ttl=None, common_name=None, locality=None,
     """
     client = vault.get_local_client()
     configure_pki_backend(client, CHARM_PKI_MP)
+    if common_name is None:
+        common_name = (
+            "Vault Intermediate Certificate Authority "
+            "({})".format(CHARM_PKI_MP)
+        )
     config = {
         #  Year - 1 hour
         'ttl': ttl or '87599h',
@@ -175,14 +183,14 @@ def get_csr(ttl=None, common_name=None, locality=None,
         'province': province,
         'ou': organizational_unit,
         'organization': organization,
-        'common_name': common_name or ("Vault Intermediate Certificate "
-                                       "Authority " "({})".format(CHARM_PKI_MP)
-                                       ),
         'locality': locality}
     config = {k: v for k, v in config.items() if v}
-    csr_info = client.write(
-        '{}/intermediate/generate/internal'.format(CHARM_PKI_MP),
-        **config)
+    csr_info = client.secrets.pki.generate_intermediate(
+        'internal',
+        common_name,
+        extra_params=config,
+        mount_point=CHARM_PKI_MP,
+    )
     if not csr_info['data']:
         raise vault.VaultError(csr_info.get('warnings', 'unknown error'))
     return csr_info['data']['csr']
@@ -210,17 +218,20 @@ def upload_signed_csr(pem, allowed_domains, allow_subdomains=True,
     client = vault.get_local_client()
     # Set the intermediate certificate authorities signing certificate to the
     # signed certificate.
-    # (hvac module doesn't expose a method for this, hence the _post call)
-    client._post(
-        'v1/{}/intermediate/set-signed'.format(CHARM_PKI_MP),
-        json={'certificate': pem.rstrip()})
+    client.secrets.pki.set_signed_intermediate(
+        pem.rstrip(),
+        mount_point=CHARM_PKI_MP
+    )
     # Generated certificates can have the CRL location and the location of the
     # issuing certificate encoded.
     addr = vault.get_access_address()
-    client.write(
-        '{}/config/urls'.format(CHARM_PKI_MP),
-        issuing_certificates="{}/v1/{}/ca".format(addr, CHARM_PKI_MP),
-        crl_distribution_points="{}/v1/{}/crl".format(addr, CHARM_PKI_MP)
+    client.secrets.pki.set_urls(
+        {
+            "issuing_certificates": "{}/v1/{}/ca".format(addr, CHARM_PKI_MP),
+            "crl_distribution_points":
+            "{}/v1/{}/crl".format(addr, CHARM_PKI_MP),
+        },
+        mount_point=CHARM_PKI_MP
     )
     # Configure a role which maps to a policy for accessing this pki
     if not max_ttl:
@@ -271,23 +282,28 @@ def generate_root_ca(ttl='87599h', allow_any_name=True, allowed_domains=None,
     if is_ca_ready(client, CHARM_PKI_MP, CHARM_PKI_ROLE):
         raise vault.VaultError('PKI CA already configured')
     config = {
-        'common_name': ("Vault Root Certificate Authority "
-                        "({})".format(CHARM_PKI_MP)),
         'ttl': ttl,
     }
-    csr_info = client.write(
-        '{}/root/generate/internal'.format(CHARM_PKI_MP),
-        **config)
+    common_name = "Vault Root Certificate Authority ({})".format(CHARM_PKI_MP)
+    csr_info = client.secrets.pki.generate_root(
+        'internal',
+        common_name,
+        extra_params=config,
+        mount_point=CHARM_PKI_MP,
+    )
     if not csr_info['data']:
         raise vault.VaultError(csr_info.get('warnings', 'unknown error'))
     cert = csr_info['data']['certificate']
     # Generated certificates can have the CRL location and the location of the
     # issuing certificate encoded.
     addr = vault.get_access_address()
-    client.write(
-        '{}/config/urls'.format(CHARM_PKI_MP),
-        issuing_certificates="{}/v1/{}/ca".format(addr, CHARM_PKI_MP),
-        crl_distribution_points="{}/v1/{}/crl".format(addr, CHARM_PKI_MP)
+    client.secrets.pki.set_urls(
+        {
+            "issuing_certificates": "{}/v1/{}/ca".format(addr, CHARM_PKI_MP),
+            "crl_distribution_points":
+            "{}/v1/{}/crl".format(addr, CHARM_PKI_MP),
+        },
+        mount_point=CHARM_PKI_MP
     )
 
     write_roles(client,
@@ -318,23 +334,33 @@ def sort_sans(sans):
 
 def write_roles(client, **kwargs):
     # Configure a role for using this PKI to issue server certs
-    client.write(
-        '{}/roles/{}'.format(CHARM_PKI_MP, CHARM_PKI_ROLE),
-        server_flag=True,
-        **kwargs)
+    client.secrets.pki.create_or_update_role(
+        CHARM_PKI_ROLE,
+        extra_params={
+            'server_flag': True,
+            **kwargs,
+        },
+        mount_point=CHARM_PKI_MP,
+    )
     # Configure a role for using this PKI to issue client-only certs
-    client.write(
-        '{}/roles/{}'.format(CHARM_PKI_MP, CHARM_PKI_ROLE_CLIENT),
-        server_flag=False,  # client certs cannot be used as server certs
-        **kwargs)
+    client.secrets.pki.create_or_update_role(
+        CHARM_PKI_ROLE_CLIENT,
+        extra_params={
+            # client certs cannot be used as server certs
+            'server_flag': False,
+            **kwargs,
+        },
+        mount_point=CHARM_PKI_MP,
+    )
 
 
 def update_roles(**kwargs):
     client = vault.get_local_client()
     # local and local-client contain the same data except for server_flag,
     # so we only need to read one, but update both
-    local = client.read(
-        '{}/roles/{}'.format(CHARM_PKI_MP, CHARM_PKI_ROLE))['data']
+    local = client.secrets.pki.read_role(
+        CHARM_PKI_ROLE, mount_point=CHARM_PKI_MP
+    )['data']
     # the reason we handle as kwargs here is because updating n-1 fields
     # causes all the others to reset. Therefore we always need to read what
     # the current values of all fields are, and apply all of them as well

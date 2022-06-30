@@ -50,5 +50,5 @@ tenacity         # vault
 pbr==5.6.0       # vault
 cryptography<3.4 # vault, keystone-saml-mellon
 lxml             # keystone-saml-mellon
-hvac             # vault, barbican-vault
+hvac<0.12.0      # vault, barbican-vault
 psutil           # cinder-lvm

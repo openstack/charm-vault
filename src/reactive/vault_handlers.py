@@ -505,8 +505,8 @@ def configure_secrets_backend():
                     reraise=True)
     def _check_vault_status(client):
         if (not service_running('vault') or
-                not client.is_initialized() or
-                client.is_sealed()):
+                not client.sys.is_initialized() or
+                client.sys.is_sealed()):
             return False
         return True
 
@@ -525,7 +525,7 @@ def configure_secrets_backend():
         log('Charm access to vault not configured, deferring'
             ' secrets backend setup', level=DEBUG)
         return
-    client.auth_approle(charm_role_id)
+    client.auth.approle.login(charm_role_id)
 
     secrets = (endpoint_from_flag('endpoint.secrets.new-request') or
                endpoint_from_flag('secrets.connected'))
@@ -568,7 +568,7 @@ def configure_secrets_backend():
         )
 
         cidr = '{}/32'.format(access_address)
-        new_role = (approle_name not in client.list_roles())
+        new_role = (approle_name not in client.auth.approle.list_roles())
 
         approle_id = vault.configure_approle(
             client,
@@ -965,7 +965,7 @@ def publish_ca_info():
         return
     client = vault.get_client(url=vault.VAULT_LOCALHOST_URL)
     tls = endpoint_from_flag('certificates.available')
-    if client.is_sealed():
+    if client.sys.is_sealed():
         log("Unable to publish ca info, service sealed.")
     else:
         tls.set_ca(vault_pki.get_ca())
@@ -1165,7 +1165,7 @@ def tune_pki_backend_config_changed():
         set_flag('failed.to.start')
         return
     client = vault.get_client(url=vault.VAULT_LOCALHOST_URL)
-    if client.is_sealed():
+    if client.sys.is_sealed():
         log("Unable to tune pki backend, service sealed.")
     else:
         ttl = config()['default-ttl']

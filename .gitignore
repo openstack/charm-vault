@@ -1,6 +1,7 @@
 *~
 build/*
 .tox/*
+src/.tox/*
 .stestr/*
 __pycache__
 .unit-state.db

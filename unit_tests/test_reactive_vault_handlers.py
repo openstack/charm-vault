@@ -670,8 +670,8 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         hvac_client = mock.MagicMock()
         _vault.get_client.return_value = hvac_client
         # Vault is up and running, init'ed and unsealed
-        hvac_client.is_initialized.return_value = True
-        hvac_client.is_sealed.return_value = False
+        hvac_client.sys.is_initialized.return_value = True
+        hvac_client.sys.is_sealed.return_value = False
         self.service_running.return_value = True
 
         _vault.get_local_charm_access_role_id.return_value = 'local-approle'
@@ -687,7 +687,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
 
         handlers.configure_secrets_backend()
 
-        hvac_client.auth_approle.assert_called_once_with('local-approle')
+        hvac_client.auth.approle.login.assert_called_once_with('local-approle')
         _vault.configure_secret_backend.assert_has_calls([
             mock.call(hvac_client, name='charm-vaultlocker'),
             mock.call(hvac_client, name='charm-supersecrets'),
@@ -883,7 +883,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
     def _set_sealed(self, _vault, status):
         hvac_client = mock.MagicMock()
         _vault.get_client.return_value = hvac_client
-        hvac_client.is_sealed.return_value = status
+        hvac_client.sys.is_sealed.return_value = status
 
     @mock.patch.object(handlers, 'client_approle_authorized')
     @mock.patch.object(handlers, 'vault')
