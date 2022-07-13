@@ -11,11 +11,10 @@ description: |
   network encryption-as-a-service, or generate AWS IAM/STS
   credentials, SQL/NoSQL databases, X.509 certificates,
   SSH credentials, and more.
-series:
-- focal
-- jammy
 tags:
 - security
+series:
+- jammy
 extra-bindings:
   access:
   external:

@@ -1,61 +1,48 @@
 - project:
     templates:
-      - charm-unit-jobs-py38
       - charm-unit-jobs-py310
     check:
       jobs:
-      - focal-mysql8
-      - focal-raft
-      - focal-raft-cluster
-      - jammy-raft
       - jammy-mysql8
+      - jammy-raft
+      - kinetic-raft:
+          voting: false
+      - kinetic-mysql8:
+          voting: false
     vars:
       needs_charm_build: true
       charm_build_name: vault
       build_type: charmcraft
+      charmcraft_channel: 2.0/stable
 
-- job:
-    name: focal-mysql8
-    parent: func-target
-    dependencies:
-      - osci-lint
-      - tox-py38
-      - charm-build
-    vars:
-      tox_extra_args: focal-mysql8
-- job:
-    name: focal-raft
-    parent: func-target
-    dependencies:
-      - osci-lint
-      - tox-py38
-      - charm-build
-    vars:
-      tox_extra_args: focal-raft
-- job:
-    name: focal-raft-cluster
-    parent: func-target
-    dependencies:
-      - osci-lint
-      - tox-py38
-      - charm-build
-    vars:
-      tox_extra_args: focal-raft-cluster
-- job:
-    name: jammy-raft
-    parent: func-target
-    dependencies:
-      - osci-lint
-      - tox-py38
-      - charm-build
-    vars:
-      tox_extra_args: jammy-raft
 - job:
     name: jammy-mysql8
     parent: func-target
     dependencies:
-      - focal-mysql8
+      - osci-lint
       - name: tox-py310
         soft: True
+      - charm-build
     vars:
       tox_extra_args: jammy-mysql8
+- job:
+    name: jammy-raft
+    parent: func-target
+    dependencies:
+      - jammy-mysql8
+    vars:
+      tox_extra_args: jammy-raft
+- job:
+    name: kinetic-mysql8
+    parent: func-target
+    dependencies:
+      - jammy-mysql8
+    vars:
+      tox_extra_args: kinetic-mysql8
+- job:
+    name: kinetic-raft
+    parent: func-target
+    dependencies:
+      - jammy-mysql8
+    vars:
+      tox_extra_args: kinetic-raft
