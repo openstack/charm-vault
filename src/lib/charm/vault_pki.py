@@ -71,7 +71,12 @@ def is_ca_ready(client, name, role):
     :returns: Whether CA is ready
     :rtype: bool
     """
-    return client.secrets.pki.read_role(role, mount_point=name) is not None
+    try:
+        # read_role raises InvalidPath is the role is not available
+        client.secrets.pki.read_role(role, mount_point=name)
+        return True
+    except hvac.exceptions.InvalidPath:
+        return False
 
 
 def get_chain(name=None):

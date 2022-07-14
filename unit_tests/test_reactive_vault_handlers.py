@@ -59,6 +59,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             'log',
             'network_get_primary_address',
             'open_port',
+            'service_reload',
             'service_restart',
             'service_running',
             'service',

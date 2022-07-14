@@ -61,8 +61,8 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
         client_mock = mock.MagicMock()
 
         def read_role(role, mount_point=None):
-            if role == "role":
-                return "role info"
+            if role != "role":
+                raise hvac.exceptions.InvalidPath()
 
         client_mock.secrets.pki.read_role.side_effect = read_role
         self.assertTrue(vault_pki.is_ca_ready(client_mock, 'mp', 'role'))
