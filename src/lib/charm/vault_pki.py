@@ -80,10 +80,12 @@ def is_ca_ready(client, name, role):
 
 
 def get_chain(name=None):
-    """Check if CA is ready for use
+    """Get the certificate chain
 
-    :returns: Whether CA is ready
-    :rtype: bool
+    :raises hvac.exceptions.VaultDown: vault is not ready
+    :raises hvac.exceptions.InvalidPath: certificate chain not found
+    :returns: certificate chain data
+    :rtype: str
     """
     client = vault.get_local_client()
     if not name:
@@ -437,7 +439,7 @@ def find_cert_in_cache(request):
     """
     try:
         ca_chain = get_chain()
-    except (hvac.exceptions.VaultDown, TypeError):
+    except (hvac.exceptions.VaultDown, hvac.exceptions.InvalidPath):
         # Fetching CA chain may fail
         ca_chain = None
 

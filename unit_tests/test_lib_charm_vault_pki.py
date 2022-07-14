@@ -84,6 +84,15 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
             'ca_chain', mount_point='my_backend')
 
     @patch.object(vault_pki.vault, 'get_local_client')
+    def test_get_chain_nonexisting(self, get_local_client):
+        client_mock = mock.MagicMock()
+        client_mock.secrets.pki.read_certificate.side_effect = (
+            hvac.exceptions.InvalidPath)
+        get_local_client.return_value = client_mock
+        with self.assertRaises(hvac.exceptions.InvalidPath):
+            vault_pki.get_chain('my_backend')
+
+    @patch.object(vault_pki.vault, 'get_local_client')
     def test_get_chain_default_pki(self, get_local_client):
         client_mock = mock.MagicMock()
         client_mock.secrets.pki.read_certificate.return_value = {
@@ -473,6 +482,25 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
 
         pki = vault_pki.get_pki_cache()
         self.assertEqual(pki, {})
+
+    @patch.object(vault_pki, 'get_pki_cache')
+    @patch.object(vault_pki, 'get_chain')
+    @patch.object(vault_pki, 'get_ca')
+    def test_find_cert_in_cache_err(self, get_ca, get_chain, get_pki_cache):
+        """Test getting cert from cache when CA is missing."""
+        get_ca.return_value = None
+        get_chain.side_effect = hvac.exceptions.InvalidPath
+
+        cert, key = vault_pki.find_cert_in_cache(MagicMock())
+
+        # assert that CA cert or chain was retrieved
+        get_ca.assert_called_once_with()
+        get_chain.assert_called_once_with()
+        # assert that function does not proceed due to the missing CA
+        get_pki_cache.assert_not_called()
+
+        self.assertIsNone(cert)
+        self.assertIsNone(key)
 
     @patch.object(vault_pki, 'get_pki_cache')
     @patch.object(vault_pki, 'get_chain')

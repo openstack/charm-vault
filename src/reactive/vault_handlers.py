@@ -1031,7 +1031,10 @@ def sync_cert_from_cache():
     try:
         # this might fail if we were restarted and need to be unsealed
         chain = vault_pki.get_chain()
-    except (vault.hvac.exceptions.VaultDown, TypeError):
+    except (
+        vault.hvac.exceptions.VaultDown,
+        vault.hvac.exceptions.InvalidPath,
+    ):
         pass
     except vault.VaultNotReady:
         # With Vault not being ready, there's no sense in continuing

@@ -4,6 +4,7 @@ from unittest.mock import patch, call
 import json
 
 import charms.reactive
+import hvac
 
 # Mock out reactive decorators prior to importing reactive.vault
 dec_mock = mock.MagicMock()
@@ -1194,6 +1195,48 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         self.is_flag_set.return_value = False
         tls = self.endpoint_from_flag.return_value
         self.is_flag_set.return_value = True
+        tls.all_requests = [mock.Mock(cert_type='cert_type1',
+                                      common_name='common_name1',
+                                      sans='sans1'),
+                            mock.Mock(cert_type='cert_type2',
+                                      common_name='common_name2',
+                                      sans='sans2'),
+                            ]
+
+        handlers.sync_cert_from_cache()
+
+        tls.set_client_cert.assert_called_once_with(
+            global_client_bundle["certificate"],
+            global_client_bundle["private_key"],
+        )
+
+        for index, request in enumerate(tls.all_requests):
+            request.set_cert.assert_called_once_with(
+                certs_in_cache[index][0],
+                certs_in_cache[index][1],
+            )
+
+    @mock.patch.object(handlers, 'vault_pki')
+    @mock.patch.object(handlers, 'leader_get')
+    def test_sync_cert_from_cache_err(self, leader_get, vault_pki):
+        """Test that it gracefully fails if get_chain doesn't succeed."""
+        global_client_bundle = {
+            "certificate": "Global client cert",
+            "private_key": "Global client key",
+        }
+        leader_get.return_value = json.dumps(global_client_bundle)
+
+        certs_in_cache = (
+            ("cn1_cert", "cn1_key"),
+            ("cn2_cert", "cn2_key"),
+        )
+        vault_pki.find_cert_in_cache.side_effect = certs_in_cache
+        vault_pki.get_chain.side_effect = hvac.exceptions.InvalidPath
+
+        self.is_flag_set.return_value = False
+        tls = self.endpoint_from_flag.return_value
+        self.is_flag_set.return_value = True
+        tls.set_chain.assert_not_called()
         tls.all_requests = [mock.Mock(cert_type='cert_type1',
                                       common_name='common_name1',
                                       sans='sans1'),
