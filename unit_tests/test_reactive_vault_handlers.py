@@ -1,10 +1,7 @@
 from unittest import mock
 from unittest.mock import patch, call
 
-import json
-
 import charms.reactive
-import hvac
 
 # Mock out reactive decorators prior to importing reactive.vault
 dec_mock = mock.MagicMock()
@@ -938,41 +935,35 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         self.set_flag.assert_called_with('failed.to.start')
         assert not _vault.get_client.called
 
-    @mock.patch.object(handlers, 'leader_get')
     @mock.patch.object(handlers, 'client_approle_authorized')
     @mock.patch.object(handlers, 'vault_pki')
     def test_publish_global_client_cert_already_gend(
-            self, vault_pki, _client_approle_authorized, leader_get):
+            self, vault_pki, _client_approle_authorized):
         _client_approle_authorized.return_value = True
         tls = self.endpoint_from_flag.return_value
-        self.is_flag_set.return_value = False
-        leader_get.return_value = json.dumps({'certificate': 'crt',
-                                              'private_key': 'key'})
+        self.is_flag_set.side_effect = [True, False]
+        self.unitdata.kv().get.return_value = {'certificate': 'crt',
+                                               'private_key': 'key'}
         handlers.publish_global_client_cert()
         assert not vault_pki.generate_certificate.called
         assert not self.set_flag.called
-        leader_get.assert_called_with('charm.vault.global-client-cert')
+        self.unitdata.kv().get.assert_called_with('charm.vault.'
+                                                  'global-client-cert')
         tls.set_client_cert.assert_called_with('crt', 'key')
 
-    @mock.patch.object(handlers, 'leader_get')
-    @mock.patch.object(handlers, 'leader_set')
     @mock.patch.object(handlers, 'client_approle_authorized')
     @mock.patch.object(handlers, 'vault_pki')
     def test_publish_global_client_cert_reissue(
-            self, vault_pki, _client_approle_authorized, leader_set,
-            leader_get
-    ):
+            self, vault_pki, _client_approle_authorized):
         _client_approle_authorized.return_value = True
         self.config.return_value = {
             'default-ttl': '3456h',
             'max-ttl': '3456h',
         }
 
-        leader_get.return_value = json.dumps({'certificate': 'stale_cert',
-                                              'private_key': 'stale_key'})
         tls = self.endpoint_from_flag.return_value
 
-        self.is_flag_set.return_value = True
+        self.is_flag_set.side_effect = [True, True]
         bundle = {'certificate': 'crt',
                   'private_key': 'key'}
         vault_pki.generate_certificate.return_value = bundle
@@ -982,21 +973,17 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
                                                           [],
                                                           '3456h',
                                                           '3456h')
-        leader_set.assert_called_with({
-            'charm.vault.global-client-cert': json.dumps(bundle)
-        })
+        self.unitdata.kv().set.assert_called_with('charm.vault.'
+                                                  'global-client-cert',
+                                                  bundle)
         self.set_flag.assert_called_with('charm.vault.'
                                          'global-client-cert.created')
         tls.set_client_cert.assert_called_with('crt', 'key')
 
-    @mock.patch.object(handlers, 'leader_get')
-    @mock.patch.object(handlers, 'leader_set')
     @mock.patch.object(handlers, 'client_approle_authorized')
     @mock.patch.object(handlers, 'vault_pki')
     def test_publish_global_client_certe(
-            self, vault_pki, _client_approle_authorized, leader_set,
-            leader_get
-    ):
+            self, vault_pki, _client_approle_authorized):
         _client_approle_authorized.return_value = True
         self.config.return_value = {
             'default-ttl': '3456h',
@@ -1004,8 +991,7 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         }
 
         tls = self.endpoint_from_flag.return_value
-        self.is_flag_set.return_value = False
-        leader_get.return_value = None
+        self.is_flag_set.side_effect = [False, False]
         bundle = {'certificate': 'crt',
                   'private_key': 'key'}
         vault_pki.generate_certificate.return_value = bundle
@@ -1015,16 +1001,15 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
                                                           [],
                                                           '3456h',
                                                           '3456h')
-        leader_set.assert_called_with(
-            {'charm.vault.global-client-cert': json.dumps(bundle)}
-        )
+        self.unitdata.kv().set.assert_called_with('charm.vault.'
+                                                  'global-client-cert',
+                                                  bundle)
         self.set_flag.assert_called_with('charm.vault.'
                                          'global-client-cert.created')
         tls.set_client_cert.assert_called_with('crt', 'key')
 
     @mock.patch.object(handlers, 'vault_pki')
     def test_create_certs(self, vault_pki):
-        vault_pki.find_cert_in_cache.return_value = (None, None)
         self.config.return_value = {
             'default-ttl': '3456h',
             'max-ttl': '3456h',
@@ -1041,18 +1026,12 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
                             mock.Mock(cert_type='cert_type2',
                                       common_name='common_name2',
                                       sans='sans2')]
-        expected_cache_calls = [call(request) for request in tls.new_requests]
         vault_pki.generate_certificate.side_effect = [
             {'certificate': 'crt1', 'private_key': 'key1'},
             handlers.vault.VaultInvalidRequest,
             {'certificate': 'crt2', 'private_key': 'key2'},
         ]
-        expected_cache_update_calls = [
-            call(tls.new_requests[0], "crt1", "key1"),
-            call(tls.new_requests[2], "crt2", "key2"),
-        ]
         handlers.create_certs()
-        vault_pki.find_cert_in_cache.assert_has_calls(expected_cache_calls)
         vault_pki.generate_certificate.assert_has_calls([
             mock.call('cert_type1', 'common_name1', 'sans1',
                       '3456h', '3456h'),
@@ -1068,195 +1047,6 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         tls.new_requests[2].set_cert.assert_has_calls([
             mock.call('crt2', 'key2'),
         ])
-        vault_pki.update_cert_cache.assert_has_calls(
-            expected_cache_update_calls
-        )
-
-    @mock.patch.object(handlers, 'vault_pki')
-    def test_create_certs_from_cache(self, vault_pki):
-        """Serve certificates from cache if they are available."""
-        cert_cache = (
-            ("common_name1_cert", "common_name1_key"),
-            ("common_name2_cert", "common_name2_key"),
-        )
-        vault_pki.find_cert_in_cache.side_effect = cert_cache
-        tls = self.endpoint_from_flag.return_value
-        self.is_flag_set.return_value = False
-        tls.new_requests = [mock.Mock(cert_type='cert_type1',
-                                      common_name='common_name1',
-                                      sans='sans1'),
-                            mock.Mock(cert_type='cert_type2',
-                                      common_name='common_name2',
-                                      sans='sans2'),
-                            ]
-
-        handlers.create_certs()
-
-        vault_pki.generate_certificate.assert_not_called()
-        for index, request in enumerate(tls.new_requests):
-            request.set_cert.assert_called_once_with(*cert_cache[index])
-
-    @mock.patch.object(handlers, 'vault_pki')
-    def test_create_certs_reissue(self, vault_pki):
-        """Test that certificates are not served from cache on reissue.
-
-        Even when certificates are available from cache, they should not
-        be reused if reissue was requested.
-        """
-        self.config.return_value = {
-            'default-ttl': '3456h',
-            'max-ttl': '3456h',
-        }
-        cert_cache = (
-            ("common_name1_cert", "common_name1_key"),
-            ("common_name2_cert", "common_name2_key"),
-        )
-        new_certs = (
-            {"certificate": "cn1_new_cert", "private_key": "cn1_new_key"},
-            {"certificate": "cn2_new_cert", "private_key": "cn2_new_key"},
-        )
-        vault_pki.find_cert_in_cache.side_effect = cert_cache
-        vault_pki.generate_certificate.side_effect = new_certs
-
-        tls = self.endpoint_from_flag.return_value
-        self.is_flag_set.return_value = True
-        tls.all_requests = [mock.Mock(cert_type='cert_type1',
-                                      common_name='common_name1',
-                                      sans='sans1'),
-                            mock.Mock(cert_type='cert_type2',
-                                      common_name='common_name2',
-                                      sans='sans2'),
-                            ]
-        expected_cache_update_calls = (
-            call(tls.all_requests[0],
-                 new_certs[0]["certificate"],
-                 new_certs[0]["private_key"]),
-            call(tls.all_requests[1],
-                 new_certs[1]["certificate"],
-                 new_certs[1]["private_key"]),
-        )
-
-        handlers.create_certs()
-
-        vault_pki.generate_certificate.assert_has_calls([
-            mock.call('cert_type1', 'common_name1', 'sans1',
-                      '3456h', '3456h'),
-            mock.call('cert_type2', 'common_name2', 'sans2',
-                      '3456h', '3456h')
-        ])
-
-        for index, request in enumerate(tls.new_requests):
-            request.set_cert.assert_called_once_with(
-                new_certs[index]["certificate"],
-                new_certs[index]["private_key"],
-            )
-        vault_pki.update_cert_cache.assert_has_calls(
-            expected_cache_update_calls
-        )
-
-    @mock.patch.object(handlers, 'vault_pki')
-    @mock.patch.object(handlers, 'remote_unit')
-    def test_cert_client_leaving(self, remote_unit, vault_pki):
-        """Test that certificates are removed from cache on unit departure."""
-        # This should be performed only on leader unit
-        self.is_flag_set.return_value = True
-        unit_name = "client/0"
-        cache_unit_id = "client_0"
-        remote_unit.return_value = unit_name
-
-        handlers.cert_client_leaving(mock.MagicMock())
-
-        vault_pki.remove_unit_from_cache.assert_called_once_with(cache_unit_id)
-
-        # non-leaders should not perform this action
-        vault_pki.remove_unit_from_cache.reset_mock()
-        self.is_flag_set.return_value = False
-
-        handlers.cert_client_leaving(mock.MagicMock())
-
-        vault_pki.remove_unit_from_cache.assert_not_called()
-
-    @mock.patch.object(handlers, 'vault_pki')
-    @mock.patch.object(handlers, 'leader_get')
-    def test_sync_cert_from_cache(self, leader_get, vault_pki):
-        """Test that non-leaders copy data from cache to relations."""
-        global_client_bundle = {
-            "certificate": "Global client cert",
-            "private_key": "Global client key",
-        }
-        leader_get.return_value = json.dumps(global_client_bundle)
-
-        certs_in_cache = (
-            ("cn1_cert", "cn1_key"),
-            ("cn2_cert", "cn2_key"),
-        )
-        vault_pki.find_cert_in_cache.side_effect = certs_in_cache
-
-        self.is_flag_set.return_value = False
-        tls = self.endpoint_from_flag.return_value
-        self.is_flag_set.return_value = True
-        tls.all_requests = [mock.Mock(cert_type='cert_type1',
-                                      common_name='common_name1',
-                                      sans='sans1'),
-                            mock.Mock(cert_type='cert_type2',
-                                      common_name='common_name2',
-                                      sans='sans2'),
-                            ]
-
-        handlers.sync_cert_from_cache()
-
-        tls.set_client_cert.assert_called_once_with(
-            global_client_bundle["certificate"],
-            global_client_bundle["private_key"],
-        )
-
-        for index, request in enumerate(tls.all_requests):
-            request.set_cert.assert_called_once_with(
-                certs_in_cache[index][0],
-                certs_in_cache[index][1],
-            )
-
-    @mock.patch.object(handlers, 'vault_pki')
-    @mock.patch.object(handlers, 'leader_get')
-    def test_sync_cert_from_cache_err(self, leader_get, vault_pki):
-        """Test that it gracefully fails if get_chain doesn't succeed."""
-        global_client_bundle = {
-            "certificate": "Global client cert",
-            "private_key": "Global client key",
-        }
-        leader_get.return_value = json.dumps(global_client_bundle)
-
-        certs_in_cache = (
-            ("cn1_cert", "cn1_key"),
-            ("cn2_cert", "cn2_key"),
-        )
-        vault_pki.find_cert_in_cache.side_effect = certs_in_cache
-        vault_pki.get_chain.side_effect = hvac.exceptions.InvalidPath
-
-        self.is_flag_set.return_value = False
-        tls = self.endpoint_from_flag.return_value
-        self.is_flag_set.return_value = True
-        tls.set_chain.assert_not_called()
-        tls.all_requests = [mock.Mock(cert_type='cert_type1',
-                                      common_name='common_name1',
-                                      sans='sans1'),
-                            mock.Mock(cert_type='cert_type2',
-                                      common_name='common_name2',
-                                      sans='sans2'),
-                            ]
-
-        handlers.sync_cert_from_cache()
-
-        tls.set_client_cert.assert_called_once_with(
-            global_client_bundle["certificate"],
-            global_client_bundle["private_key"],
-        )
-
-        for index, request in enumerate(tls.all_requests):
-            request.set_cert.assert_called_once_with(
-                certs_in_cache[index][0],
-                certs_in_cache[index][1],
-            )
 
     @mock.patch.object(handlers, 'vault_pki')
     def test_tune_pki_backend(self, vault_pki):
