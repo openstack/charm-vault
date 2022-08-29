@@ -41,6 +41,7 @@ from charmhelpers.core.hookenv import (
 
 from charmhelpers.core.host import (
     service,
+    service_reload,
     service_restart,
     service_running,
     write_file,
@@ -236,6 +237,12 @@ def configure_vault(context):
     if any_file_changed([VAULT_CONFIG, VAULT_SYSTEMD_CONFIG]):
         # force a restart if config has changed
         clear_flag('started')
+    else:
+        # If vault isn't going to be totally restarted, reload it.
+        # This will pick up things like certificates changed on disk.
+        # It is inexpensive and doesn't cause vault to be resealed,
+        # so we can always reload it here.
+        service_reload(service_name='vault')
 
 
 @when_not("is-update-status-hook")
