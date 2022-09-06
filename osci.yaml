@@ -5,9 +5,12 @@
       jobs:
       - jammy-mysql8
       - jammy-raft
+      - jammy-raft-cluster
+      - kinetic-mysql8:
+          voting: false
       - kinetic-raft:
           voting: false
-      - kinetic-mysql8:
+      - kinetic-raft-cluster:
           voting: false
     vars:
       needs_charm_build: true
@@ -33,6 +36,13 @@
     vars:
       tox_extra_args: jammy-raft
 - job:
+    name: jammy-raft-cluster
+    parent: func-target
+    dependencies:
+      - jammy-mysql8
+    vars:
+      tox_extra_args: jammy-raft-cluster
+- job:
     name: kinetic-mysql8
     parent: func-target
     dependencies:
@@ -46,3 +56,10 @@
       - jammy-mysql8
     vars:
       tox_extra_args: kinetic-raft
+- job:
+    name: kinetic-raft-cluster
+    parent: func-target
+    dependencies:
+      - jammy-mysql8
+    vars:
+      tox_extra_args: kinetic-raft-cluster
