@@ -29,7 +29,7 @@ applications:
 
   keystone-mysql-router:
     charm: ch:mysql-router
-    channel: latest/edge
+    channel: 8.0/edge
 
   mysql-innodb-cluster:
     charm: ch:mysql-innodb-cluster
@@ -40,7 +40,7 @@ applications:
       - '0'
       - '1'
       - '2'
-    channel: latest/edge
+    channel: 8.0/edge
 
   vault:
     num_units: 3
@@ -58,7 +58,7 @@ applications:
       openstack-origin: *openstack-origin
     to:
       - '4'
-    channel: latest/edge
+    channel: yoga/edge
 
   ceph-mon:
     charm: ch:ceph-mon
@@ -69,7 +69,7 @@ applications:
       - '5'
       - '6'
       - '7'
-    channel: latest/edge
+    channel: quincy/edge
 
   ceph-osd:
     charm: ch:ceph-osd
@@ -84,7 +84,7 @@ applications:
       - '8'
       - '9'
       - '10'
-    channel: latest/edge
+    channel: quincy/edge
 
 relations:
   - - 'keystone:shared-db'

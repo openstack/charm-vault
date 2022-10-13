@@ -8,10 +8,7 @@ gate_bundles:
 - jammy-raft-cluster
 - jammy-mysql8
 
-dev_bundles:
-- kinetic-raft
-- kinetic-raft-cluster
-- kinetic-mysql8
+dev_bundles: []
 
 smoke_bundles:
 - jammy-mysql8
@@ -41,7 +38,4 @@ tests:
 - zaza.openstack.charm_tests.vault.tests.VaultTest
 
 tests_options:
-  force_deploy:
-    - kinetic-raft
-    - kinetic-raft-cluster
-    - kinetic-mysql8
+  force_deploy: []
