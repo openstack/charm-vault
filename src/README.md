@@ -28,7 +28,7 @@ The `channel` option sets the snap channel to use for deployment (e.g.
 ## Deployment
 
 > **Important**: Some steps must be performed after deployment. Section
-  'Post-deployment tasks' covers this.
+> 'Post-deployment tasks' covers this.
 
 Vault is often containerised. Here a single unit is deployed to a new
 container on machine '1':
@@ -36,8 +36,8 @@ container on machine '1':
     juju deploy --to lxd:1 vault
 
 > **Note**: When Vault is deployed to metal or to a KVM guest the charm will
-  enable mlock (memory locking) to prevent secrets from being saved to disk via
-  page swapping. The mlock feature is not available to containers.
+> enable mlock (memory locking) to prevent secrets from being saved to disk via
+> page swapping. The mlock feature is not available to containers.
 
 Now connect the vault application to an existing database. This can be the
 cloud's database or a separate, dedicated database.
@@ -49,21 +49,21 @@ Some database applications are influenced by the series. Prior to focal
 
 For percona-cluster:
 
-    juju add-relation vault:shared-db percona-cluster:shared-db
+    juju relate vault:shared-db percona-cluster:shared-db
 
 For mysql-innodb-cluster:
 
     juju deploy mysql-router vault-mysql-router
-    juju add-relation vault-mysql-router:db-router mysql-innodb-cluster:db-router
-    juju add-relation vault-mysql-router:shared-db vault:shared-db
+    juju relate vault-mysql-router:db-router mysql-innodb-cluster:db-router
+    juju relate vault-mysql-router:shared-db vault:shared-db
 
 For postgresql:
 
-    juju add-relation vault:db postgresql:db
+    juju relate vault:db postgresql:db
 
 > **Note**: For PostgreSQL, its version and the underlying machine series must
-  be compatible (e.g. 9.5/xenial or 10/bionic). The postgresql charm's
-  configuration option `version` is used to select a version at deploy time.
+> be compatible (e.g. 9.5/xenial or 10/bionic). The postgresql charm's
+> configuration option `version` is used to select a version at deploy time.
 
 If no databases are related, vault will be auto configured to use
 its embedded raft storage backend for storage and HA.
@@ -81,9 +81,8 @@ configured with the following charm configuration options:
 * `ssl-key`
 
 > **Note**: The process of encrypting the Vault API is separate from that of
- using Vault to manage the encryption of OpenStack API services. See [Managing
- TLS certificates][cdg-vault-certs] in the [OpenStack Charms Deployment
-  Guide][cdg] for details.
+> using Vault to manage the encryption of OpenStack API services. See [Managing TLS certificates][cdg-vault-certs]
+> in the [OpenStack Charms Deployment Guide][cdg] for details.
 
 ## Post-deployment tasks
 
@@ -142,8 +141,8 @@ Besides displaying the five unseal keys the output also includes an "initial
 root token". This token is used to access the Vault API.
 
 > **Warning**: It is not possible to unseal Vault without the unseal keys, nor
-  is it possible to manage Vault without the initial root token. **Store this
-  information in a safe place immediately**.
+> is it possible to manage Vault without the initial root token. **Store this
+> information in a safe place immediately**.
 
 ### Unseal Vault
 
@@ -159,9 +158,9 @@ unsealing a unit change the value of the ``VAULT_ADDR`` variable so that it
 points to that unit.
 
 > **Note**: Maintenance work on the cloud may require vault units to be paused
-  and later resumed. A resumed vault unit will be sealed and will therefore
-  require unsealing. See [Managing power events][cdg-power-events] in the
-  [OpenStack Charms Deployment Guide][cdg] for details.
+> and later resumed. A resumed vault unit will be sealed and will therefore
+> require unsealing. See [Managing power events][cdg-power-events] in the
+> [OpenStack Charms Deployment Guide][cdg] for details.
 
 Proceed to the next step once all units have been unsealed.
 
