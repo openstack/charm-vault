@@ -457,6 +457,14 @@ def update_nagios(svc):
         'Check running vault server version and health',
         '/usr/lib/nagios/plugins/check_vault_health.py',
     )
+    c = config()
+    if ssl_available(c):
+        nrpe.add_check(
+            'vault_cert',
+            'Check for expiration of vault certificate',
+            '/usr/lib/nagios/plugins/check_http -I 127.0.0.1 -p 8200 \
+-u /healthcheck -S -C 30,14'
+        )
     nrpe.write()
     set_state('vault.nrpe.configured')
 

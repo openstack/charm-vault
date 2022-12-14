@@ -1251,3 +1251,50 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         get_local_client.return_value.ha_status = {'ha_enabled': True}
         handlers._assess_status()
         self.assertIn('Unit is ready', self.status_set.call_args[0][1])
+
+    @mock.patch.object(handlers, 'NRPE')
+    @mock.patch.object(handlers, 'get_nagios_hostname')
+    @mock.patch.object(handlers, 'get_nagios_unit_name')
+    @mock.patch.object(handlers, 'write_file')
+    @mock.patch.object(handlers, 'add_init_service_checks')
+    @mock.patch("builtins.open")
+    def test_update_nagios_with_ssl(self,
+                                    open,
+                                    add_init_service_checks,
+                                    write_file,
+                                    get_nagios_unit_name,
+                                    get_nagios_hostname,
+                                    mock_nrpe):
+
+        get_nagios_hostname.return_value = "testunit"
+        get_nagios_unit_name.return_value = "my_vault/0"
+        self.config.return_value = {
+            'ssl-cert': '',
+            'ssl-key': '',
+        }
+        nrpe_add_check_calls = [
+            mock.call(hostname="testunit"),
+            mock.call().remove_check(shortname='vault_version'),
+            mock.call().add_check(
+                'vault_health',
+                'Check running vault server version and health',
+                '/usr/lib/nagios/plugins/check_vault_health.py',),
+            mock.call().write(),
+        ]
+        handlers.update_nagios(None)
+        mock_nrpe.assert_has_calls(nrpe_add_check_calls)
+        self.config.return_value = {
+            'ssl-cert': 'test-cert',
+            'ssl-key': 'test-key',
+        }
+        nrpe_add_check_calls.insert(
+            3,
+            mock.call().add_check(
+                'vault_cert',
+                'Check for expiration of vault certificate',
+                '/usr/lib/nagios/plugins/check_http -I 127.0.0.1 -p 8200 \
+-u /healthcheck -S -C 30,14'
+            )
+        )
+        handlers.update_nagios(None)
+        mock_nrpe.assert_has_calls(nrpe_add_check_calls)
