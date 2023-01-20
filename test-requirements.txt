@@ -50,3 +50,6 @@ pbr==5.6.0       # vault
 cryptography<3.4 # vault, keystone-saml-mellon
 lxml             # keystone-saml-mellon
 hvac             # vault, barbican-vault
+
+# Pin urllib3 for py35 unit tests
+urllib3<=1.26.7;python_version<'3.6'
