@@ -15,6 +15,7 @@ tags:
 - security
 series:
 - jammy
+- kinetic
 extra-bindings:
   access:
   external:
