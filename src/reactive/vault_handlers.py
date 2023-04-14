@@ -38,7 +38,6 @@ from charmhelpers.core.hookenv import (
     log,
     network_get_primary_address,
     open_port,
-    remote_unit,
     status_set,
     unit_private_ip,
 )
@@ -343,11 +342,6 @@ def upgrade_charm():
     remove_state('vault.nrpe.configured')
     remove_state('vault.ssl.configured')
     remove_state('vault.requested-lb')
-    # mkalcok: When upgrading from version of a charm that did not have a
-    # certificate cache, we need to populate the cache with already issued
-    # certificates. Otherwise the non-leader units would not be able to sync
-    # their certificate data via cache.
-    set_flag('needs-cert-cache-repopulation')
 
 
 @when_not("is-update-status-hook")
@@ -1081,102 +1075,21 @@ def publish_global_client_cert():
         log("Vault not authorized: Skipping publish_global_client_cert",
             "WARNING")
         return
+    cert_created = is_flag_set('charm.vault.global-client-cert.created')
     reissue_requested = is_flag_set('certificates.reissue.global.requested')
     tls = endpoint_from_flag('certificates.available')
-    cluster = endpoint_from_name('cluster')
-    bundle = cluster.get_global_client_cert()
-    certificate_present = "certificate" in bundle and "private_key" in bundle
-    if not certificate_present or reissue_requested:
+    if not cert_created or reissue_requested:
         ttl = config()['default-ttl']
         max_ttl = config()['max-ttl']
         bundle = vault_pki.generate_certificate('client',
                                                 'global-client',
                                                 [], ttl, max_ttl)
-        cluster.set_global_client_cert(bundle)
+        unitdata.kv().set('charm.vault.global-client-cert', bundle)
         set_flag('charm.vault.global-client-cert.created')
         clear_flag('certificates.reissue.global.requested')
-
-    tls.set_client_cert(bundle['certificate'], bundle['private_key'])
-
-
-@when('certificates.available')
-@when('charm.vault.ca.ready')
-@when('leadership.is_leader')
-@when('needs-cert-cache-repopulation')
-def repopulate_cert_cache():
-    """Force repopulation of cert cache on the leader.
-
-    Certain circumstances such as 'upgrade-charm' hook should force the leader
-    to populate the cert cache, so then non-leaders will follow in the
-    'sync_cert_from_cache' method."""
-    tls = endpoint_from_flag('certificates.available')
-    if tls:
-        vault_pki.populate_cert_cache(tls)
-    clear_flag('needs-cert-cache-repopulation')
-
-
-@when("certificates.available")
-@when_not('leadership.is_leader')
-def sync_cert_from_cache():
-    """Sync cert and key data in the tls-certificate relation.
-
-    Non-leader units should keep the relation data up-to-date according
-    to the data from PKI cache that's maintained by the leader. This ensures
-    that "client" units can use data from any of the related vault units to
-    receive valid keys and certificates.
-    """
-    tls = endpoint_from_flag('certificates.available')
-    cert_requests = tls.all_requests
-    ca = vault_pki.get_ca()
-    if not ca:
-        # Don't bother syncing now if we are in a state
-        # which we don't have a CA, defer syncing to later
-        return
-    # propagate CA cert
-    tls.set_ca(ca)
-    try:
-        # this might fail if we were restarted and need to be unsealed
-        chain = vault_pki.get_chain()
-    except (
-        vault.hvac.exceptions.VaultDown,
-        vault.hvac.exceptions.InvalidPath,
-    ):
-        pass
-    except vault.VaultNotReady:
-        # With Vault not being ready, there's no sense in continuing
-        return
-    except vault.hvac.exceptions.InternalServerError:
-        # We either cannot communicate with Vault or
-        # parse a CA/Chain in this state, defer syncing to later
-        return
     else:
-        tls.set_chain(chain)
-
-    # propagate global client cert from cache
-    cluster = endpoint_from_name('cluster')
-    bundle = cluster.get_global_client_cert()
-    if bundle.get('certificate') and bundle.get('private_key'):
-        tls.set_client_cert(bundle['certificate'], bundle['private_key'])
-
-    # update certificate data in relations
-    for request in cert_requests:
-        cache_cert, cache_key = vault_pki.find_cert_in_cache(request)
-        if cache_cert and cache_key:
-            request.set_cert(cache_cert, cache_key)
-
-
-@hook('certificates-relation-departed')
-def cert_client_leaving(relation):
-    """Remove certs and keys of the departing unit from cache."""
-    if is_flag_set('leadership.is_leader'):
-        # mkalcok: Due to certificates requests replacing "/" in the unit
-        # name with "_" (see: tls_certificates_common.CertificateRequest),
-        # we must emulate the same behavior when removing unit certs from
-        # cache.
-        departing_unit = remote_unit()
-        log("Removing certificates for {} from cache.".format(departing_unit))
-        unit_name = departing_unit.replace('/', '_')
-        vault_pki.remove_unit_from_cache(unit_name)
+        bundle = unitdata.kv().get('charm.vault.global-client-cert')
+    tls.set_client_cert(bundle['certificate'], bundle['private_key'])
 
 
 @when_not("is-update-status-hook")
@@ -1206,16 +1119,6 @@ def create_certs():
                 processed_applications.append(request.application_name)
         else:
             cert_type = request.cert_type
-
-        cache_cert, cache_key = vault_pki.find_cert_in_cache(request)
-        if not reissue_requested and cache_cert and cache_key:
-            # If valid certificates are in cache, and re-issue was not
-            # requested, reuse them.
-            log("Reusing certificate for unit '{}' and CN '{}' from "
-                "cache.".format(request.unit_name, request.common_name))
-            request.set_cert(cache_cert, cache_key)
-            continue
-
         try:
             ttl = config()['default-ttl']
             max_ttl = config()['max-ttl']
@@ -1223,9 +1126,6 @@ def create_certs():
                                                     request.common_name,
                                                     request.sans, ttl, max_ttl)
             request.set_cert(bundle['certificate'], bundle['private_key'])
-            vault_pki.update_cert_cache(request,
-                                        bundle["certificate"],
-                                        bundle["private_key"])
         except vault.VaultInvalidRequest as e:
             log(str(e), level=ERROR)
             continue  # TODO: report failure back to client
