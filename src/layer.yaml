@@ -9,7 +9,6 @@ includes:
  - interface:hacluster
  - interface:vault-kv
  - interface:tls-certificates
- - interface:vault-ha
 options:
   basic:
     use_venv: True
