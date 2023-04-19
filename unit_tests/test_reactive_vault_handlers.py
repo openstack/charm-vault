@@ -57,8 +57,8 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
             'log',
             'network_get_primary_address',
             'open_port',
-            'service_restart',
             'service_running',
+            'service_stop',
             'service',
             'set_state',
             'status_set',
@@ -530,31 +530,28 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         self.config.assert_called_with('channel')
         self.set_flag.assert_called_with('snap.channel.invalid')
 
-    @patch.object(handlers.vault, 'can_restart')
-    def test_snap_refresh_restartable(self, can_restart):
-        conf = {
-            'channel': 'edge',
-            'totally-unsecure-auto-unlock': False}
+    @mock.patch.object(handlers, "start_vault")
+    def test_snap_refresh_version_not_changed(self, mock_start_vault):
+        conf = {'channel': '1.8/edge'}
         self.config.side_effect = lambda x: conf[x]
-        can_restart.return_value = True
+        self.snap.get_installed_channel.return_value = "1.8/edge"
         handlers.snap_refresh()
-        self.snap.refresh.assert_called_with('vault', channel='edge')
-        self.service_restart.assert_called_with('vault')
-        self.clear_flag.assert_called_with('snap.channel.invalid')
-        config_calls = [
-            mock.call('channel'),
-            mock.call('totally-unsecure-auto-unlock')]
-        self.config.assert_has_calls(config_calls)
+        self.config.assert_called_once_with("channel")
+        self.clear_flag.assert_called_once_with('snap.channel.invalid')
+        self.snap.refresh.assert_not_called()
+        mock_start_vault.assert_not_called()
 
-    @patch.object(handlers.vault, 'can_restart')
-    def test_snap_refresh_not_restartable(self, can_restart):
-        self.config.return_value = 'edge'
-        can_restart.return_value = False
+    @mock.patch.object(handlers, "start_vault")
+    def test_snap_refresh_version_changed(self, mock_start_vault):
+        conf = {'channel': '1.8/edge'}
+        self.config.side_effect = lambda x: conf[x]
+        self.snap.get_installed_channel.return_value = "1.8/stable"
         handlers.snap_refresh()
-        self.snap.refresh.assert_called_with('vault', channel='edge')
-        self.config.assert_called_with('channel')
-        self.service_restart.assert_not_called()
-        self.clear_flag.assert_called_with('snap.channel.invalid')
+        self.config.assert_called_with("channel")
+        self.clear_flag.assert_called_once_with('snap.channel.invalid')
+        self.service_stop.assert_called_once_with("vault")
+        self.snap.refresh.assert_called_once_with("vault", channel="1.8/edge")
+        mock_start_vault.assert_called_once()
 
     def test_snap_refresh_invalid_channel(self):
         self.config.return_value = 'foorbar'
