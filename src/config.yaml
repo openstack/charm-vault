@@ -56,6 +56,9 @@ options:
     default: 1.6/stable
     description: >-
       The snap channel to install from.
+      WARNING: Changing this value will cause ALL the vault units to become
+      sealed, due to the snap refresh and the service being restarted on each
+      unit.
   dns-ha-access-record:
     type: string
     default:
