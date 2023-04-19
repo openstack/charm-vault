@@ -45,8 +45,8 @@ from charmhelpers.core.hookenv import (
 from charmhelpers.core.host import (
     service,
     service_reload,
-    service_restart,
     service_running,
+    service_stop,
     write_file,
     is_container,
     mkdir,
@@ -192,12 +192,13 @@ def snap_refresh():
     channel = config('channel') or 'stable'
     if validate_snap_channel(channel):
         clear_flag('snap.channel.invalid')
-        snap.refresh('vault', channel=channel)
-        if vault.can_restart():
-            log("Restarting vault", level=DEBUG)
-            service_restart('vault')
-            if config('totally-unsecure-auto-unlock'):
-                vault.prepare_vault()
+        if snap.get_installed_channel("vault") != channel:
+            log("Stopping the vault.service to perform a snap refresh")
+            service_stop("vault")
+            snap.refresh("vault", channel=channel)
+            log("Vault was refreshed to {}".format(channel))
+            start_vault()
+            log("The vault.service has been started")
     else:
         set_flag('snap.channel.invalid')
 
