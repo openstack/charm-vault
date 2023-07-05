@@ -6,6 +6,12 @@
       - jammy-mysql8
       - jammy-raft
       - jammy-raft-cluster
+      - lunar-mysql8:
+          voting: false
+      - lunar-raft:
+          voting: false
+      - lunar-raft-cluster:
+          voting: false
       - mantic-mysql8:
           voting: false
       - mantic-raft:
@@ -43,6 +49,27 @@
     vars:
       tox_extra_args: '-- jammy-raft-cluster'
 - job:
+    name: lunar-mysql8
+    parent: func-target
+    dependencies:
+      - jammy-mysql8
+    vars:
+      tox_extra_args: '-- lunar-mysql8'
+- job:
+    name: lunar-raft
+    parent: func-target
+    dependencies:
+      - jammy-mysql8
+    vars:
+      tox_extra_args: '-- lunar-raft'
+- job:
+    name: lunar-raft-cluster
+    parent: func-target
+    dependencies:
+      - jammy-mysql8
+    vars:
+      tox_extra_args: '-- lunar-raft-cluster'
+- job:
     name: mantic-mysql8
     parent: func-target
     dependencies:
@@ -63,3 +90,4 @@
       - jammy-mysql8
     vars:
       tox_extra_args: '-- mantic-raft-cluster'
+
