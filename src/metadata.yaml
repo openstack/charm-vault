@@ -11,6 +11,7 @@ description: |
   network encryption-as-a-service, or generate AWS IAM/STS
   credentials, SQL/NoSQL databases, X.509 certificates,
   SSH credentials, and more.
+docs: https://discourse.charmhub.io/t/vault-docs-index/11008
 tags:
 - security
 series:
