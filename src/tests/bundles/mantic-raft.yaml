@@ -3,7 +3,7 @@ variables:
 
 local_overlay_enabled: False
 
-series: kinetic
+series: mantic
 
 comment:
 - 'machines section to decide order of deployment. database sooner = faster'
@@ -42,7 +42,7 @@ applications:
 
   vault:
     num_units: 1
-    charm: ../../../vault_ubuntu-23.04-amd64.charm
+    charm: ../../../vault_ubuntu-23.10-amd64.charm
     to:
       - '3'
 
