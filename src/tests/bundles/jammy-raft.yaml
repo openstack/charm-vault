@@ -42,7 +42,7 @@ applications:
 
   vault:
     num_units: 1
-    charm: ../../../vault.charm
+    charm: ../../../vault_ubuntu-22.04-amd64.charm
     to:
       - '3'
 
