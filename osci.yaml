@@ -10,7 +10,7 @@
       needs_charm_build: true
       charm_build_name: vault
       build_type: charmcraft
-      charmcraft_channel: 2.0/stable
+      charmcraft_channel: latest/edge
 
 - job:
     name: jammy-mysql8
