@@ -565,7 +565,14 @@ class CertCache:
         """
         value = hookenv.leader_get(key)
         if value:
-            return json.loads(value)
+            if key is not None:
+                # load the value that was json serialised in _store()
+                return json.loads(value)
+            else:
+                # due to a weird asymetry been leader_set and leader_get,
+                # leader_get() already deserialises as json so if no key was
+                # specified, it's already been deserialised.
+                return value
         return ""
 
     @staticmethod
