@@ -17,6 +17,7 @@ tags:
 series:
 - jammy
 - lunar
+- mantic
 extra-bindings:
   access:
   external:

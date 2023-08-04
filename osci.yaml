@@ -6,17 +6,17 @@
       - jammy-mysql8
       - jammy-raft
       - jammy-raft-cluster
-      - kinetic-mysql8:
+      - mantic-mysql8:
           voting: false
-      - kinetic-raft:
+      - mantic-raft:
           voting: false
-      - kinetic-raft-cluster:
+      - mantic-raft-cluster:
           voting: false
     vars:
       needs_charm_build: true
       charm_build_name: vault
       build_type: charmcraft
-      charmcraft_channel: 2.2/stable
+      charmcraft_channel: 2.x/edge
 
 - job:
     name: jammy-mysql8
@@ -43,23 +43,23 @@
     vars:
       tox_extra_args: '-- jammy-raft-cluster'
 - job:
-    name: kinetic-mysql8
+    name: mantic-mysql8
     parent: func-target
     dependencies:
       - jammy-mysql8
     vars:
-      tox_extra_args: '-- kinetic-mysql8'
+      tox_extra_args: '-- mantic-mysql8'
 - job:
-    name: kinetic-raft
+    name: mantic-raft
     parent: func-target
     dependencies:
       - jammy-mysql8
     vars:
-      tox_extra_args: '-- kinetic-raft'
+      tox_extra_args: '-- mantic-raft'
 - job:
-    name: kinetic-raft-cluster
+    name: mantic-raft-cluster
     parent: func-target
     dependencies:
       - jammy-mysql8
     vars:
-      tox_extra_args: '-- kinetic-raft-cluster'
+      tox_extra_args: '-- mantic-raft-cluster'
