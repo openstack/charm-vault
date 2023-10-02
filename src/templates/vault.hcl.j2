@@ -35,9 +35,6 @@ ha_storage "etcd" {
   tls_ca_file = "{{ etcd_tls_ca_file }}"
   tls_cert_file = "{{ etcd_tls_cert_file }}"
   tls_key_file = "{{ etcd_tls_key_file }}"
-  # Use tls_insecure_skip_verify due to https://github.com/hashicorp/vault/issues/4961
-  # tls_insecure_skip_verify is currently only supported in the snap version of vault.
-  tls_insecure_skip_verify = "true"
   etcd_api = "v3"
 }
 
