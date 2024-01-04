@@ -7,11 +7,13 @@ authorize-charm:
   required:
   - token
 refresh-secrets:
-  description: Refresh secret_id's and re-issue retrieval tokens for secrets endpoints
+  description: Refresh secret_id's and re-issue retrieval tokens for secrets
+     endpoints
 get-csr:
   description: >-
      Get intermediate CA csr (DEPRECATED Please use regenerate-intermediate-ca).
-     WARNING Current certificates will be invalidated and will be recreated after the CSR is signed and uploaded.
+     WARNING Current certificates will be invalidated and will be recreated
+     after the CSR is signed and uploaded.
   properties:
     # Depending on the configuration of CA that will sign the CSRs it
     # may be necessary to ensure these fields match the CA
@@ -47,7 +49,8 @@ get-csr:
 regenerate-intermediate-ca:
   description: >-
      Create a new intermediate CA and return a csr for it
-     WARNING Current certificates will be invalidated and will be recreated after the CSR is signed and uploaded.
+     WARNING Current certificates will be invalidated and will be recreated
+     after the CSR is signed and uploaded.
   properties:
     # Depending on the configuration of CA that will sign the CSRs it
     # may be necessary to ensure these fields match the CA
@@ -107,6 +110,17 @@ upload-signed-csr:
       default: '8760h'
       description: >-
         Specifies the maximum Time To Live
+    crl-distribution-point:
+      type: string
+      default: ''
+      description: >-
+        Provide an alternative URL for the Certificate Revocation List (CRL)
+        distribution point that is included in all certificates issued by
+        Vault. This relies on an external process to synchronise certificates
+        revoked in Vault to this external distribution point and should only
+        be used when the Vault infrastructure is not generally accessible to
+        client endpoints used to access services secured by the Vault
+        Intermediate CA. 
     root-ca:
       type: string
       description: >-
@@ -184,8 +198,8 @@ restart:
   description: Restarts the vault unit. Vault will become sealed.
 reload:
   description: >-
-    Reloads the vault unit. This allows for limited configuration options to be
-    re-read. Vault will not become sealed.
+    Reloads the vault unit. This allows for limited configuration options to
+    be re-read. Vault will not become sealed.
 generate-certificate:
   description: Generate a certificate agains the Vault PKI
   properties:

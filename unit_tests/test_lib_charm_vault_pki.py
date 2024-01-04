@@ -262,6 +262,23 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
 
     @patch.object(vault_pki.vault, 'get_access_address')
     @patch.object(vault_pki.vault, 'get_local_client')
+    def test_upload_signed_csr_cdp(self, get_local_client, get_access_address):
+        get_access_address.return_value = 'https://vault.local:8200'
+        client_mock = mock.MagicMock()
+        get_local_client.return_value = client_mock
+        local_url = 'https://vault.local:8200/v1/charm-pki-local'
+        vault_pki.upload_signed_csr(
+            'MYPEM', 'example.com', crl_distribution_point='https://cdp.com'
+        )
+        client_mock.secrets.pki.set_urls.assert_called_once_with(
+            {
+                'issuing_certificates': '{}/ca'.format(local_url),
+                'crl_distribution_points': 'https://cdp.com',
+            }, mount_point=vault_pki.CHARM_PKI_MP
+        )
+
+    @patch.object(vault_pki.vault, 'get_access_address')
+    @patch.object(vault_pki.vault, 'get_local_client')
     def test_upload_signed_csr_ipv4(
         self, get_local_client, get_access_address
     ):
@@ -335,7 +352,7 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
             allow_subdomains=False,
             enforce_hostnames=True,
             allow_any_name=False,
-            max_ttl='42h')
+            max_ttl='42h', crl_distribution_point=None)
         client_mock.secrets.pki.set_signed_intermediate.\
             assert_called_once_with(
                 'MYPEM', mount_point='charm-pki-local'

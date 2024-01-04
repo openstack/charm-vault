@@ -23,7 +23,9 @@ def configure_pki_backend(client, name, ttl=None, max_ttl=None):
     :param name: Name of backend to enable
     :type name: str
     :param ttl: TTL
-    :type ttl: str
+    :type ttl: Optional[str]
+    :param max_ttl: max TTL
+    :type max_ttl: Optional[str]
     """
     if not vault.is_backend_mounted(client, name):
         client.sys.enable_secrets_engine(
@@ -53,7 +55,9 @@ def tune_pki_backend(ttl=None, max_ttl=None):
     """Assert tuning options for Charm PKI backend
 
     :param ttl: TTL
-    :type ttl: str
+    :type ttl: Optional[str]
+    :param max_ttl: max TTL
+    :type max_ttl: Optional[str]
     """
     client = vault.get_local_client()
     if vault.is_backend_mounted(client, CHARM_PKI_MP):
@@ -68,6 +72,10 @@ def is_ca_ready(client, name, role):
 
     :returns: Whether CA is ready
     :rtype: bool
+    :param name: Name of backend to enable
+    :type name: str
+    :param role: Name of role
+    :type role: str
     """
     try:
         # read_role raises InvalidPath is the role is not available
@@ -156,17 +164,17 @@ def get_csr(ttl=None, common_name=None, locality=None,
     fields embedded in the CSR may have to match the CA.
 
     :param ttl: TTL
-    :type ttl: string
+    :type ttl: Optional[string]
     :param country: The C (Country) values in the subject field of the CSR
-    :type country: string
+    :type country: Optional[string]
     :param province: The ST (Province) values in the subject field of the CSR.
-    :type province: string
+    :type province: Optional[string]
     :param organization: The O (Organization) values in the subject field of
                          the CSR
-    :type organization: string
+    :type organization: Optional[string]
     :param organizational_unit: The OU (OrganizationalUnit) values in the
                                 subject field of the CSR.
-    :type organizational_unit: string
+    :type organizational_unit: Optional[string]
     :param common_name: The CN (Common_Name) values in the
                                 subject field of the CSR.
     :param locality: The L (Locality) values in the
@@ -203,22 +211,24 @@ def get_csr(ttl=None, common_name=None, locality=None,
 
 def upload_signed_csr(pem, allowed_domains, allow_subdomains=True,
                       enforce_hostnames=False, allow_any_name=True,
-                      max_ttl=None):
+                      max_ttl=None, crl_distribution_point=None):
     """Upload signed csr to intermediate pki
 
     :param pem: signed csr in pem format
     :type pem: string
     :param allow_subdomains: Specifies if clients can request certificates with
                              CNs that are subdomains of the CNs:
-    :type allow_subdomains: bool
+    :type allow_subdomains: Optional[bool]
     :param enforce_hostnames: Specifies if only valid host names are allowed
                               for CNs, DNS SANs, and the host part of email
                               addresses.
-    :type enforce_hostnames: bool
+    :type enforce_hostnames: Optional[bool]
     :param allow_any_name: Specifies if clients can request any CN
-    :type allow_any_name: bool
+    :type allow_any_name:Optional[bool]
     :param max_ttl: Specifies the maximum Time To Live
-    :type max_ttl: str
+    :type max_ttl: Optional[str]
+    :param crl_distribution_point: Defines the CRL Distribution Point URI
+    :type crl_distribution_point: Optional[str]
     """
     client = vault.get_local_client()
     # Set the intermediate certificate authorities signing certificate to the
@@ -234,7 +244,8 @@ def upload_signed_csr(pem, allowed_domains, allow_subdomains=True,
         {
             "issuing_certificates": "{}/v1/{}/ca".format(addr, CHARM_PKI_MP),
             "crl_distribution_points":
-            "{}/v1/{}/crl".format(addr, CHARM_PKI_MP),
+            ("{}/v1/{}/crl".format(addr, CHARM_PKI_MP)
+             if not crl_distribution_point else crl_distribution_point),
         },
         mount_point=CHARM_PKI_MP
     )
@@ -388,7 +399,7 @@ def is_cert_from_vault(cert, name=None):
     :param cert: the certificate in x509 form
     :type cert: str
     :param name: the mount point in value, default CHARM_PKI_MP
-    :type name: str
+    :type name: Optional[str]
     :returns: True if issued by vault, False if unknown.
     :raises VaultDown: if vault is down.
     :raises VaultNotReady: if vault is sealed.

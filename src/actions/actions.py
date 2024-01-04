@@ -131,7 +131,8 @@ def upload_signed_csr(*args):
         allow_subdomains=action_config.get('allow-subdomains'),
         enforce_hostnames=action_config.get('enforce-hostnames'),
         allow_any_name=action_config.get('allow-any-name'),
-        max_ttl=action_config.get('max-ttl'))
+        max_ttl=action_config.get('max-ttl'),
+        crl_distribution_point=action_config.get('crl-distribution-point'))
     set_flag('charm.vault.ca.ready')
     set_flag('pki.backend.tuned')
     # reissue any certificates we might previously have provided
