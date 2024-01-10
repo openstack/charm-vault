@@ -856,6 +856,21 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
         self.assertEqual(vault_pki.CertCache(request)._fetch("mine"),
                          'the-value')
 
+    @patch.object(vault_pki.hookenv, 'leader_get')
+    def test_certcache__fetch_none(self, mock_leader_get):
+        request = self._default_request()
+        # due to weird asymetry between leader_get and leader_set, if no
+        # attribute is passed to leader_get() then the result is the
+        # deserialised set of key, values as a dictionary.
+        leader_get = {
+            'a': 'an-a',
+            'b': 'an-b',
+        }
+
+        mock_leader_get.return_value = leader_get
+        self.assertEqual(vault_pki.CertCache(request)._fetch(None), leader_get)
+        mock_leader_get.assert_called_once_with(None)
+
     @patch.object(vault_pki.hookenv, 'leader_set')
     def test_certcache__store(self, mock_leader_set):
         request = self._default_request()
