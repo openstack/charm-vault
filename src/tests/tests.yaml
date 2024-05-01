@@ -9,9 +9,6 @@ gate_bundles:
 - jammy-mysql8
 
 dev_bundles:
-- lunar-raft
-- lunar-raft-cluster
-- lunar-mysql8
 - mantic-raft
 - mantic-raft-cluster
 - mantic-mysql8
@@ -42,9 +39,6 @@ tests:
 
 tests_options:
   force_deploy:
-    - lunar-raft
-    - lunar-raft-cluster
-    - lunar-mysql8
     - mantic-raft
     - mantic-raft-cluster
     - mantic-mysql8
