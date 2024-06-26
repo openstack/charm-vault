@@ -3,7 +3,7 @@ variables:
 
 local_overlay_enabled: False
 
-series: mantic
+series: noble
 
 comment:
 - 'machines section to decide order of deployment. database sooner = faster'
@@ -22,8 +22,6 @@ machines:
   '8':
   '9':
   '10':
-  '11':
-  '12':
 
 applications:
 
@@ -43,12 +41,10 @@ applications:
     channel: latest/edge
 
   vault:
-    num_units: 3
-    charm: ../../../vault_ubuntu-23.10-amd64.charm
+    num_units: 1
+    charm: ../../../vault_amd64.charm
     to:
       - '3'
-      - '11'
-      - '12'
 
   keystone:
     charm: ch:keystone

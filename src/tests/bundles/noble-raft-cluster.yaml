@@ -3,7 +3,7 @@ variables:
 
 local_overlay_enabled: False
 
-series: jammy
+series: noble
 
 comment:
 - 'machines section to decide order of deployment. database sooner = faster'
@@ -44,7 +44,7 @@ applications:
 
   vault:
     num_units: 3
-    charm: ../../../vault_ubuntu-22.04-amd64.charm
+    charm: ../../../vault_amd64.charm
     to:
       - '3'
       - '11'

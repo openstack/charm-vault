@@ -3,23 +3,17 @@
       - charm-unit-jobs-py310
     check:
       jobs:
-      - jammy-mysql8
-      - jammy-raft
-      - jammy-raft-cluster
-      - mantic-mysql8:
-          voting: false
-      - mantic-raft:
-          voting: false
-      - mantic-raft-cluster:
-          voting: false
+      - noble-mysql8
+      - noble-raft
+      - noble-raft-cluster
     vars:
       needs_charm_build: true
       charm_build_name: vault
       build_type: charmcraft
-      charmcraft_channel: 2.x/stable
+      charmcraft_channel: 3.x/beta
 
 - job:
-    name: jammy-mysql8
+    name: noble-mysql8
     parent: func-target
     dependencies:
       - osci-lint
@@ -27,40 +21,19 @@
         soft: True
       - charm-build
     vars:
-      tox_extra_args: '-- jammy-mysql8'
+      tox_extra_args: '-- noble-mysql8'
 - job:
-    name: jammy-raft
+    name: noble-raft
     parent: func-target
     dependencies:
-      - jammy-mysql8
+      - noble-mysql8
     vars:
-      tox_extra_args: '-- jammy-raft'
+      tox_extra_args: '-- noble-raft'
 - job:
-    name: jammy-raft-cluster
+    name: noble-raft-cluster
     parent: func-target
     dependencies:
-      - jammy-mysql8
+      - noble-mysql8
     vars:
-      tox_extra_args: '-- jammy-raft-cluster'
-- job:
-    name: mantic-mysql8
-    parent: func-target
-    dependencies:
-      - jammy-mysql8
-    vars:
-      tox_extra_args: '-- mantic-mysql8'
-- job:
-    name: mantic-raft
-    parent: func-target
-    dependencies:
-      - jammy-mysql8
-    vars:
-      tox_extra_args: '-- mantic-raft'
-- job:
-    name: mantic-raft-cluster
-    parent: func-target
-    dependencies:
-      - jammy-mysql8
-    vars:
-      tox_extra_args: '-- mantic-raft-cluster'
+      tox_extra_args: '-- noble-raft-cluster'
 

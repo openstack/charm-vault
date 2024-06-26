@@ -1,20 +1,22 @@
 netifaces
 hvac<0.12.0
-# for xenial support, tenacity 8.0.0+ drops support for py35
-tenacity<8.0.0
+tenacity
 pbr
 # for lunar support, psycopg 2.9.5 adds support for py311
 psycopg2<2.9.5;python_version<'3.11'
 psycopg2>=2.9.5;python_version>='3.11'
-# for xenial support, requests 2.26.0 drops support for py35
-requests<2.26.0
+requests
 
 
 psutil
 
+git+https://github.com/wolsen/charms.reactive.git@fix-entry-points#egg=charms.reactive
+
 git+https://github.com/openstack/charms.openstack.git#egg=charms.openstack
 
 git+https://github.com/juju/charm-helpers.git#egg=charmhelpers
+
+git+https://github.com/wolsen/ops-reactive-interface.git@fix-endpoints#egg=ops_reactive_interface
 
 loadbalancer-interface
 
