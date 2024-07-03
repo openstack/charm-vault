@@ -3,6 +3,7 @@ Description=HashiCorp Vault
 After=syslog.target
 
 [Service]
+LimitNOFILE=65536
 Type=simple
 ExecStart=/snap/bin/vault server -config /var/snap/vault/common/vault.hcl
 ExecReload=/bin/kill --signal HUP $MAINPID
