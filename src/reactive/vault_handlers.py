@@ -1,4 +1,5 @@
 import base64
+import io
 import os
 import psycopg2
 import subprocess
@@ -402,9 +403,11 @@ def configure_ssl():
         status_set('maintenance', 'installing SSL key and cert')
         ssl_key = base64.decodebytes(c['ssl-key'].encode())
         write_file('/var/snap/vault/common/vault.key', ssl_key, perms=0o600)
-        ssl_cert = base64.decodebytes(c['ssl-cert'].encode())
+
+        ssl_cert: bytes = decode_and_sanitize(c['ssl-cert'])
         if c['ssl-chain']:
-            ssl_cert = ssl_cert + base64.decodebytes(c['ssl-chain'].encode())
+            ssl_cert = ssl_cert + decode_and_sanitize(c['ssl-chain'])
+
         write_file('/var/snap/vault/common/vault.crt', ssl_cert, perms=0o600)
         set_state('vault.ssl.available')
     else:
@@ -418,6 +421,24 @@ def configure_ssl():
 
     set_state('vault.ssl.configured')
     remove_state('configured')
+
+
+def decode_and_sanitize(ssl_cert_unsanitized_b64: str) -> bytes:
+    r"""Decodes a base-64-encoded certificate and sanitizes it
+    by removing windows (\r and \rf) line endings
+
+    Args:
+        ssl_cert_unsanitized_b64: string, encoded as base64, containing a SSL
+        certificate
+
+    Returns:
+        Certificate decoded (from base64) with line endings as \n and
+        not \r or \r\n. The result is encoded as a sequence of bytes
+    """
+
+    unsanizited_cert = base64.decodebytes(ssl_cert_unsanitized_b64.encode())
+    sanitized_cert = io.TextIOWrapper(io.BytesIO(unsanizited_cert)).read()
+    return sanitized_cert.encode()
 
 
 @when('config.changed.ssl-cert')
