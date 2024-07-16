@@ -1,3 +1,5 @@
+import base64
+import subprocess
 from unittest import mock
 from unittest.mock import patch, call
 
@@ -100,6 +102,38 @@ class TestHandlers(unit_tests.test_utils.CharmTestCase):
         self.assertTrue(handlers.ssl_available({
             'ssl-cert': 'acert',
             'ssl-key': 'akey'}))
+
+    @mock.patch.object(handlers, 'write_file')
+    @mock.patch.object(subprocess, 'check_call')
+    def test_sanitize_ssl_certs(self, _, write_file: mock.MagicMock):
+        """Tests whether windows based certs are sanitized
+        before producing vault.crt file"""
+
+        # arrange
+        unsanitized_cert_b64 = base64.encodebytes(
+            unit_tests.test_utils.DUMMY_CERTIFICATE_UNSANITIZED.encode()
+        ).decode()
+
+        self.config.return_value = {
+            'ssl-cert': unsanitized_cert_b64,
+            'ssl-chain': unsanitized_cert_b64,
+            'ssl-ca': 'noop',
+            'ssl-key': 'akey'}
+
+        # act
+        handlers.configure_ssl()
+
+        # verify
+        expected_cert_file_contents = (
+            unit_tests.test_utils.DUMMY_CERTIFICATE_SANITIZED.encode() +
+            unit_tests.test_utils.DUMMY_CERTIFICATE_SANITIZED.encode()
+        )
+        expected_write_file_call = mock.call(
+            '/var/snap/vault/common/vault.crt',
+            expected_cert_file_contents,
+            perms=0o600)
+
+        self.assertIn(expected_write_file_call, write_file.call_args_list)
 
     @patch.object(handlers.vault, 'can_restart')
     def test_configure_vault(self, can_restart):
