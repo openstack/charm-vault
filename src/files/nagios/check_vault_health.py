@@ -8,11 +8,11 @@
 #
 
 import json
-import socket
+import re
 import ssl
+import subprocess
 import sys
 
-from textwrap import dedent
 from urllib.request import urlopen
 
 VAULT_HEALTH_URL = 'http://127.0.0.1:8220/v1/sys/health?standbycode=200&'\
@@ -22,26 +22,46 @@ VAULT_HEALTH_URL = 'http://127.0.0.1:8220/v1/sys/health?standbycode=200&'\
                    'uninitcode=200'
 VAULT_VERIFY_SSL = False
 
-SNAPD_INFO_REQUEST = dedent("""\
-    GET /v2/snaps/{snap} HTTP/1.1\r
-    Host:\r
-    \r
-    """)
-
-SNAPD_SOCKET = '/run/snapd.socket'
-
 
 def get_vault_snap_version():
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as snapd:
-        snapd.connect(SNAPD_SOCKET)
-        snapd.sendall(SNAPD_INFO_REQUEST.format(snap='vault').encode('utf-8'))
-        # TODO(pjdc): This should be a loop.
-        info = json.loads(
-            snapd.recv(1024 * 1024).decode('utf-8').split('\n')[-1])
-        version = info['result']['version']
-        if version.startswith('v'):
-            version = version[1:]
-        return version
+    """Returns the vault snap version installed.
+
+    Returns the version of the vault snap installed. This is taken
+    from the output of the `snap info vault` command.
+
+    :returns: the version string for the snap installed
+    :raises: subprocess.CalledProcessError if the command to get the
+             snap version information fails
+    :raises: ValueError if the version string cannot be determined.
+    """
+    try:
+        output = subprocess.check_output(["snap", "info", "vault"],
+                                         encoding=("utf-8"))
+    except subprocess.CalledProcessError:
+        # This is captured in the calling code and results in a
+        # CRITICAL printed to the output
+        raise
+
+    # Search for the line that starts with "installed: ..."
+    # to parse the version string. If the snap is not installed,
+    # this line will not be present in the output.
+    match = re.search(r'^installed:\s*(?P<version>[version:\w.-]*).*$',
+                      output, flags=re.M)
+    version = None
+    if match:
+        version = match.group('version')
+
+    if version is None:
+        raise ValueError("Unable to determine version from output. "
+                         "Is vault snap installed?")
+
+    # The snap versions adopt the actual vault version. If for some reason
+    # this starts with a v, then strip it off. Note: this is carry over
+    # from the previous incarnation of this code and likely unnecessary.
+    if version.startswith("v"):
+        version = version[1:]
+
+    return version
 
 
 def get_vault_server_health(verify=True):
