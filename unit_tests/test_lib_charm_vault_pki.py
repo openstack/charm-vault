@@ -124,7 +124,8 @@ class TestLibCharmVaultPKI(unit_tests.test_utils.CharmTestCase):
             'data': 'data'}
         get_local_client.return_value = client_mock
         is_ca_ready.return_value = True
-        sort_sans.side_effect = lambda l: (l[0], l[1])
+        sort_sans.side_effect = lambda lambda_value: (lambda_value[0],
+                                                      lambda_value[1])
         vault_pki.generate_certificate('server',
                                        'example.com',
                                        ([], []),
