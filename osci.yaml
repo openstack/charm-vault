@@ -10,7 +10,7 @@
       needs_charm_build: true
       charm_build_name: vault
       build_type: charmcraft
-      charmcraft_channel: 2.x/stable
+      charmcraft_channel: 3.x/stable
 
 - job:
     name: jammy-mysql8
@@ -36,3 +36,27 @@
       - jammy-mysql8
     vars:
       tox_extra_args: jammy-raft-cluster
+- job:
+    name: noble-mysql8
+    parent: func-target
+    dependencies:
+      - osci-lint
+      - name: tox-py312
+        soft: True
+      - charm-build
+    vars:
+      tox_extra_args: noble-mysql8
+- job:
+    name: noble-raft
+    parent: func-target
+    dependencies:
+      - noble-mysql8
+    vars:
+      tox_extra_args: noble-raft
+- job:
+    name: noble-raft-cluster
+    parent: func-target
+    dependencies:
+      - noble-mysql8
+    vars:
+      tox_extra_args: noble-raft-cluster

@@ -7,11 +7,14 @@ gate_bundles:
 - jammy-raft
 - jammy-raft-cluster
 - jammy-mysql8
+- noble-raft
+- noble-raft-cluster
+- noble-mysql8
 
 dev_bundles: []
 
 smoke_bundles:
-- jammy-mysql8
+- noble-mysql8
 
 target_deploy_status:
   easyrsa:

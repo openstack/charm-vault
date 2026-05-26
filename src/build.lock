@@ -13,16 +13,16 @@
       "item": "layer:basic",
       "url": "https://github.com/juju-solutions/layer-basic.git",
       "vcs": null,
-      "branch": "edec607e05812df8d226b4aed71d09373767c0d7",
-      "commit": "edec607e05812df8d226b4aed71d09373767c0d7"
+      "branch": "7852b1138cff6c34d483479269e7682c687798e5",
+      "commit": "7852b1138cff6c34d483479269e7682c687798e5"
     },
     {
       "type": "layer",
       "item": "layer:snap",
       "url": "https://git.launchpad.net/layer-snap",
       "vcs": null,
-      "branch": "049618f7b90c323ec3b8e56cafb8e3273074caec",
-      "commit": "049618f7b90c323ec3b8e56cafb8e3273074caec"
+      "branch": "5c5d1b62efe1c8406c92043a52c719a7eee07156",
+      "commit": "5c5d1b62efe1c8406c92043a52c719a7eee07156"
     },
     {
       "type": "layer",
@@ -45,16 +45,16 @@
       "item": "interface:nrpe-external-master",
       "url": "https://github.com/canonical/nrpe-external-master-interface",
       "vcs": null,
-      "branch": "95d744d1dbc4d86fb0462283c9371619bf5bbc24",
-      "commit": "95d744d1dbc4d86fb0462283c9371619bf5bbc24"
+      "branch": "c58fe7b01a151d933681b5bf67e47ad3de65eeaa",
+      "commit": "c58fe7b01a151d933681b5bf67e47ad3de65eeaa"
     },
     {
       "type": "layer",
       "item": "interface:pgsql",
       "url": "https://git.launchpad.net/interface-pgsql",
       "vcs": null,
-      "branch": "c35ef4aa80012d42314db8afa4dde87970204cd9",
-      "commit": "c35ef4aa80012d42314db8afa4dde87970204cd9"
+      "branch": "676b6422c5a4d328bdc47af894f4e44886bd7040",
+      "commit": "676b6422c5a4d328bdc47af894f4e44886bd7040"
     },
     {
       "type": "layer",
@@ -77,202 +77,30 @@
       "item": "interface:hacluster",
       "url": "https://github.com/openstack/charm-interface-hacluster.git",
       "vcs": null,
-      "branch": "5fc5216f51dcf98530d45e137d55fd94b39d150a",
-      "commit": "5fc5216f51dcf98530d45e137d55fd94b39d150a"
+      "branch": "d91e83a1fa59a13f4160febfe536c68dc762e436",
+      "commit": "d91e83a1fa59a13f4160febfe536c68dc762e436"
     },
     {
       "type": "layer",
       "item": "interface:vault-kv",
       "url": "https://github.com/openstack-charmers/charm-interface-vault-kv.git",
       "vcs": null,
-      "branch": "dceab99ac3739cc7265e386287f100f1bfebc47f",
-      "commit": "dceab99ac3739cc7265e386287f100f1bfebc47f"
+      "branch": "6f7848ccd50a84258269b81c2f9205f6441e26d0",
+      "commit": "6f7848ccd50a84258269b81c2f9205f6441e26d0"
     },
     {
       "type": "layer",
       "item": "interface:tls-certificates",
       "url": "https://github.com/juju-solutions/interface-tls-certificates",
       "vcs": null,
-      "branch": "d9850016d930a6d507b9fd45e2598d327922b140",
-      "commit": "d9850016d930a6d507b9fd45e2598d327922b140"
+      "branch": "671eee13d9f7d02b9862f8a3a3498b37c236fd60",
+      "commit": "671eee13d9f7d02b9862f8a3a3498b37c236fd60"
     },
     {
       "type": "python_module",
-      "package": "cached-property",
+      "package": "websocket_client",
       "vcs": null,
-      "version": "1.5.2"
-    },
-    {
-      "type": "python_module",
-      "package": "Jinja2",
-      "vcs": null,
-      "version": "3.1.2"
-    },
-    {
-      "type": "python_module",
-      "package": "netaddr",
-      "vcs": null,
-      "version": "0.7.19"
-    },
-    {
-      "type": "python_module",
-      "package": "tomli",
-      "vcs": null,
-      "version": "2.0.1"
-    },
-    {
-      "type": "python_module",
-      "package": "netifaces",
-      "vcs": null,
-      "version": "0.11.0"
-    },
-    {
-      "type": "python_module",
-      "package": "wheel",
-      "vcs": null,
-      "version": "0.37.1"
-    },
-    {
-      "type": "python_module",
-      "package": "pbr",
-      "vcs": null,
-      "version": "5.10.0"
-    },
-    {
-      "type": "python_module",
-      "package": "six",
-      "vcs": null,
-      "version": "1.16.0"
-    },
-    {
-      "type": "python_module",
-      "package": "chardet",
-      "vcs": null,
-      "version": "4.0.0"
-    },
-    {
-      "type": "python_module",
-      "package": "packaging",
-      "vcs": null,
-      "version": "21.3"
-    },
-    {
-      "type": "python_module",
-      "package": "charmhelpers",
-      "url": "git+https://github.com/juju/charm-helpers.git",
-      "branch": "stable/zed",
-      "version": "4f884fa39609e55a04348a44baa6b0ac3336bd08",
-      "vcs": "git"
-    },
-    {
-      "type": "python_module",
-      "package": "setuptools",
-      "vcs": null,
-      "version": "62.1.0"
-    },
-    {
-      "type": "python_module",
-      "package": "ops_reactive_interface",
-      "vcs": null,
-      "version": "1.0.1"
-    },
-    {
-      "type": "python_module",
-      "package": "pyparsing",
-      "vcs": null,
-      "version": "3.0.9"
-    },
-    {
-      "type": "python_module",
-      "package": "requests",
-      "vcs": null,
-      "version": "2.25.1"
-    },
-    {
-      "type": "python_module",
-      "package": "urllib3",
-      "vcs": null,
-      "version": "1.26.12"
-    },
-    {
-      "type": "python_module",
-      "package": "marshmallow-enum",
-      "vcs": null,
-      "version": "1.5.1"
-    },
-    {
-      "type": "python_module",
-      "package": "flit_core",
-      "vcs": null,
-      "version": "3.7.1"
-    },
-    {
-      "type": "python_module",
-      "package": "pip",
-      "vcs": null,
-      "version": "22.0.4"
-    },
-    {
-      "type": "python_module",
-      "package": "charms.openstack",
-      "url": "git+https://github.com/openstack/charms.openstack.git",
-      "branch": "stable/zed",
-      "version": "bf2e867e9e18c28b0e1ba813440ec771b520b2aa",
-      "vcs": "git"
-    },
-    {
-      "type": "python_module",
-      "package": "setuptools_scm",
-      "vcs": null,
-      "version": "6.4.2"
-    },
-    {
-      "type": "python_module",
-      "package": "MarkupSafe",
-      "vcs": null,
-      "version": "2.1.1"
-    },
-    {
-      "type": "python_module",
-      "package": "idna",
-      "vcs": null,
-      "version": "2.10"
-    },
-    {
-      "type": "python_module",
-      "package": "loadbalancer_interface",
-      "vcs": null,
-      "version": "1.1.1"
-    },
-    {
-      "type": "python_module",
-      "package": "marshmallow",
-      "vcs": null,
-      "version": "3.18.0"
-    },
-    {
-      "type": "python_module",
-      "package": "tenacity",
-      "vcs": null,
-      "version": "7.0.0"
-    },
-    {
-      "type": "python_module",
-      "package": "ops",
-      "vcs": null,
-      "version": "1.5.3"
-    },
-    {
-      "type": "python_module",
-      "package": "psutil",
-      "vcs": null,
-      "version": "5.9.2"
-    },
-    {
-      "type": "python_module",
-      "package": "charms.reactive",
-      "vcs": null,
-      "version": "1.5.2"
+      "version": "1.9.0"
     },
     {
       "type": "python_module",
@@ -282,9 +110,211 @@
     },
     {
       "type": "python_module",
+      "package": "charms.openstack",
+      "url": "git+https://github.com/openstack/charms.openstack.git",
+      "branch": "stable/caracal",
+      "version": "bd5a9552498d65ebd28809564e672e40b2d0ea95",
+      "vcs": "git"
+    },
+    {
+      "type": "python_module",
+      "package": "ops",
+      "vcs": null,
+      "version": "3.7.1"
+    },
+    {
+      "type": "python_module",
+      "package": "charms_reactive",
+      "vcs": null,
+      "version": "1.5.3"
+    },
+    {
+      "type": "python_module",
+      "package": "packaging",
+      "vcs": null,
+      "version": "26.2"
+    },
+    {
+      "type": "python_module",
+      "package": "certifi",
+      "vcs": null,
+      "version": "2026.5.20"
+    },
+    {
+      "type": "python_module",
+      "package": "anyio",
+      "vcs": null,
+      "version": "3.6.2"
+    },
+    {
+      "type": "python_module",
+      "package": "opentelemetry_api",
+      "vcs": null,
+      "version": "1.42.1"
+    },
+    {
+      "type": "python_module",
+      "package": "tenacity",
+      "vcs": null,
+      "version": "9.1.4"
+    },
+    {
+      "type": "python_module",
       "package": "psycopg2",
       "vcs": null,
-      "version": "2.8.6"
+      "version": "2.9.4"
+    },
+    {
+      "type": "python_module",
+      "package": "pip",
+      "vcs": null,
+      "version": "22.0.4"
+    },
+    {
+      "type": "python_module",
+      "package": "Cython",
+      "vcs": null,
+      "version": "0.29.37"
+    },
+    {
+      "type": "python_module",
+      "package": "setuptools",
+      "vcs": null,
+      "version": "68.2.2"
+    },
+    {
+      "type": "python_module",
+      "package": "six",
+      "vcs": null,
+      "version": "1.17.0"
+    },
+    {
+      "type": "python_module",
+      "package": "netifaces",
+      "vcs": null,
+      "version": "0.11.0"
+    },
+    {
+      "type": "python_module",
+      "package": "cached_property",
+      "vcs": null,
+      "version": "2.0.1"
+    },
+    {
+      "type": "python_module",
+      "package": "marshmallow-enum",
+      "vcs": null,
+      "version": "1.5.1"
+    },
+    {
+      "type": "python_module",
+      "package": "requests",
+      "vcs": null,
+      "version": "2.34.2"
+    },
+    {
+      "type": "python_module",
+      "package": "charset_normalizer",
+      "vcs": null,
+      "version": "3.4.7"
+    },
+    {
+      "type": "python_module",
+      "package": "typing_extensions",
+      "vcs": null,
+      "version": "4.15.0"
+    },
+    {
+      "type": "python_module",
+      "package": "netaddr",
+      "vcs": null,
+      "version": "0.7.19"
+    },
+    {
+      "type": "python_module",
+      "package": "pyyaml",
+      "vcs": null,
+      "version": "6.0.3"
+    },
+    {
+      "type": "python_module",
+      "package": "loadbalancer_interface",
+      "vcs": null,
+      "version": "1.2.1"
+    },
+    {
+      "type": "python_module",
+      "package": "flit_scm",
+      "vcs": null,
+      "version": "1.7.0"
+    },
+    {
+      "type": "python_module",
+      "package": "setuptools_scm",
+      "vcs": null,
+      "version": "6.4.2"
+    },
+    {
+      "type": "python_module",
+      "package": "idna",
+      "vcs": null,
+      "version": "3.18"
+    },
+    {
+      "type": "python_module",
+      "package": "MarkupSafe",
+      "vcs": null,
+      "version": "2.1.5"
+    },
+    {
+      "type": "python_module",
+      "package": "urllib3",
+      "vcs": null,
+      "version": "2.7.0"
+    },
+    {
+      "type": "python_module",
+      "package": "marshmallow",
+      "vcs": null,
+      "version": "3.26.2"
+    },
+    {
+      "type": "python_module",
+      "package": "sniffio",
+      "vcs": null,
+      "version": "1.3.0"
+    },
+    {
+      "type": "python_module",
+      "package": "psutil",
+      "vcs": null,
+      "version": "7.2.2"
+    },
+    {
+      "type": "python_module",
+      "package": "ops_reactive_interface",
+      "vcs": null,
+      "version": "1.1.0"
+    },
+    {
+      "type": "python_module",
+      "package": "tomli",
+      "vcs": null,
+      "version": "2.4.1"
+    },
+    {
+      "type": "python_module",
+      "package": "wheel",
+      "vcs": null,
+      "version": "0.47.0"
+    },
+    {
+      "type": "python_module",
+      "package": "charmhelpers",
+      "url": "git+https://github.com/juju/charm-helpers.git",
+      "branch": "stable/caracal",
+      "version": "5ccef7c6bdeab43647d182e5bb04f5a495ec0a51",
+      "vcs": "git"
     },
     {
       "type": "python_module",
@@ -294,15 +324,21 @@
     },
     {
       "type": "python_module",
-      "package": "certifi",
+      "package": "flit_core",
       "vcs": null,
-      "version": "2022.9.24"
+      "version": "3.12.0"
     },
     {
       "type": "python_module",
-      "package": "PyYAML",
+      "package": "pbr",
       "vcs": null,
-      "version": "5.3.1"
+      "version": "7.0.3"
+    },
+    {
+      "type": "python_module",
+      "package": "jinja2",
+      "vcs": null,
+      "version": "3.1.6"
     }
   ]
 }

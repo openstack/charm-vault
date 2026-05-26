@@ -7,3 +7,5 @@ __pycache__
 .unit-state.db
 interfaces
 *.charm
+.coverage
+.charmcraft_output_packages.txt

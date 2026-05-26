@@ -16,6 +16,7 @@ tags:
 - security
 series:
 - jammy
+- noble
 extra-bindings:
   access:
   external:

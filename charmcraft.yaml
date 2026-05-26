@@ -4,21 +4,24 @@ parts:
   charm:
     source: src/
     plugin: reactive
+    reactive-charm-build-arguments:
+      - --binary-wheels-from-source
+      - --use-lock-file-branches
+      - --verbose
     build-snaps:
-      - charm
+      - charm/3.x/stable
     build-packages:
       - libpq-dev
     build-environment:
-      - CHARM_INTERFACES_DIR: /root/project/interfaces/
-      - CHARM_LAYERS_DIR: /root/project/layers/
+      - CHARM_INTERFACES_DIR: $CRAFT_PROJECT_DIR/interfaces/
+      - CHARM_LAYERS_DIR: $CRAFT_PROJECT_DIR/layers/
 
-bases:
-  - build-on:
-      - name: ubuntu
-        channel: "22.04"
-        architectures:
-          - amd64
-    run-on:
-      - name: ubuntu
-        channel: "22.04"
-        architectures: [amd64, s390x, ppc64el, arm64]
+platforms:
+  ubuntu@22.04:amd64:
+  ubuntu@22.04:arm64:
+  ubuntu@22.04:ppc64el:
+  ubuntu@22.04:s390x:
+  ubuntu@24.04:amd64:
+  ubuntu@24.04:arm64:
+  ubuntu@24.04:ppc64el:
+  ubuntu@24.04:s390x:
