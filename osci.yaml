@@ -6,6 +6,9 @@
       - jammy-mysql8
       - jammy-raft
       - jammy-raft-cluster
+      - noble-raft
+      - noble-raft-cluster
+      - noble-mysql8
     vars:
       needs_charm_build: true
       charm_build_name: vault

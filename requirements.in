@@ -3,7 +3,7 @@
 # choices of *requirements.txt files for OpenStack Charms:
 #     https://github.com/openstack-charmers/release-tools
 #
-setuptools<=68.2.2
+setuptools<82.0.0
 
 # NOTE: newer versions of cryptography require a Rust compiler to build,
 # see
@@ -15,5 +15,5 @@ cryptography<3.4
 pyyaml>=5.0,<5.4.0  # https://github.com/juju/charm-tools/pull/659
 jsonschema<4.18.0  # jsonschema 4.18.0 depends on Rust (via rpds-py)
 #git+https://github.com/juju/charm-tools.git
-charm-tools<3.1
+git+https://github.com/juju/charm-tools.git
 simplejson
