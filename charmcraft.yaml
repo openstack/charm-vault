@@ -12,6 +12,7 @@ parts:
       - charm/3.x/stable
     build-packages:
       - libpq-dev
+      - libpython3-dev
     build-environment:
       - CHARM_INTERFACES_DIR: $CRAFT_PROJECT_DIR/interfaces/
       - CHARM_LAYERS_DIR: $CRAFT_PROJECT_DIR/layers/
