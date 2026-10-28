@@ -85,8 +85,8 @@
       "item": "interface:vault-kv",
       "url": "https://github.com/openstack-charmers/charm-interface-vault-kv.git",
       "vcs": null,
-      "branch": "b3c7ee0de83cf6626eae51522358ec0e38fb88d8",
-      "commit": "b3c7ee0de83cf6626eae51522358ec0e38fb88d8"
+      "branch": "950badf39f01f6e9fd71eb136cccdcdf690f4484",
+      "commit": "950badf39f01f6e9fd71eb136cccdcdf690f4484"
     },
     {
       "type": "layer",
